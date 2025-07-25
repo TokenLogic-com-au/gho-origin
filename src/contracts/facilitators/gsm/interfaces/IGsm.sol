@@ -157,8 +157,7 @@ interface IGsm is IAccessControl, IGhoFacilitator {
 
   /**
    * @notice Rescue and transfer tokens locked in this contract
-   * @dev If calling from a Gsm4626 instance, distributeFeesToTreasury() must be called before in order to update _accruedFees.
-   * _accruedFees can become stale if _cumulateYieldInGho() has not been recently called.
+   * @dev In a Gsm4626 instance, distributeFeesToTreasury() must be called first to ensure the accounting of accrued fees is up-to-date.
    * @param token The address of the token
    * @param to The address of the recipient
    * @param amount The amount of token to transfer
