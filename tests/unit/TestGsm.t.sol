@@ -91,6 +91,21 @@ contract TestGsm is TestGhoBase {
     gsm.initialize(address(this), TREASURY, DEFAULT_GSM_USDX_EXPOSURE, address(GHO_RESERVE));
   }
 
+  function testTypehash() public view {
+    bytes32 buyTypeHash = vm.eip712HashType('BuyAssetWithSig');
+    bytes32 sellTypeHash = vm.eip712HashType('SellAssetWithSig');
+    assertEq(
+      buyTypeHash,
+      GHO_GSM.BUY_ASSET_WITH_SIG_TYPEHASH(),
+      'Unexpected buy asset typed data hash'
+    );
+    assertEq(
+      sellTypeHash,
+      GHO_GSM.SELL_ASSET_WITH_SIG_TYPEHASH(),
+      'Unexpected sell asset typed data hash'
+    );
+  }
+
   function testSellAssetZeroFee() public {
     vm.expectEmit(true, true, false, true, address(GHO_GSM));
     emit FeeStrategyUpdated(address(GHO_GSM_FIXED_FEE_STRATEGY), address(0));
@@ -181,19 +196,14 @@ contract TestGsm is TestGhoBase {
 
     assertEq(GHO_GSM.nonces(gsmSignerAddr), 0, 'Unexpected before gsmSignerAddr nonce');
 
-    bytes32 digest = keccak256(
-      abi.encode(
-        '\x19\x01',
-        GHO_GSM.DOMAIN_SEPARATOR(),
-        GSM_SELL_ASSET_WITH_SIG_TYPEHASH,
-        abi.encode(
-          gsmSignerAddr,
-          DEFAULT_GSM_USDX_AMOUNT,
-          gsmSignerAddr,
-          GHO_GSM.nonces(gsmSignerAddr),
-          deadline
-        )
-      )
+    bytes32 digest = _getSellAssetTypedDataHash(
+      EIP712Types.SellAssetWithSig({
+        originator: gsmSignerAddr,
+        maxAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: gsmSignerAddr,
+        nonce: GHO_GSM.nonces(gsmSignerAddr),
+        deadline: deadline
+      })
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(gsmSignerKey, digest);
     bytes memory signature = abi.encodePacked(r, s, v);
@@ -239,19 +249,14 @@ contract TestGsm is TestGhoBase {
 
     assertEq(GHO_GSM.nonces(gsmSignerAddr), 0, 'Unexpected before gsmSignerAddr nonce');
 
-    bytes32 digest = keccak256(
-      abi.encode(
-        '\x19\x01',
-        GHO_GSM.DOMAIN_SEPARATOR(),
-        GSM_SELL_ASSET_WITH_SIG_TYPEHASH,
-        abi.encode(
-          gsmSignerAddr,
-          DEFAULT_GSM_USDX_AMOUNT,
-          gsmSignerAddr,
-          GHO_GSM.nonces(gsmSignerAddr),
-          deadline
-        )
-      )
+    bytes32 digest = _getSellAssetTypedDataHash(
+      EIP712Types.SellAssetWithSig({
+        originator: gsmSignerAddr,
+        maxAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: gsmSignerAddr,
+        nonce: GHO_GSM.nonces(gsmSignerAddr),
+        deadline: deadline
+      })
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(gsmSignerKey, digest);
     bytes memory signature = abi.encodePacked(r, s, v);
@@ -286,19 +291,14 @@ contract TestGsm is TestGhoBase {
   function testRevertSellAssetWithSigExpiredSignature() public {
     uint256 deadline = block.timestamp - 1;
 
-    bytes32 digest = keccak256(
-      abi.encode(
-        '\x19\x01',
-        GHO_GSM.DOMAIN_SEPARATOR(),
-        GSM_SELL_ASSET_WITH_SIG_TYPEHASH,
-        abi.encode(
-          gsmSignerAddr,
-          DEFAULT_GSM_USDX_AMOUNT,
-          gsmSignerAddr,
-          GHO_GSM.nonces(gsmSignerAddr),
-          deadline
-        )
-      )
+    bytes32 digest = _getSellAssetTypedDataHash(
+      EIP712Types.SellAssetWithSig({
+        originator: gsmSignerAddr,
+        maxAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: gsmSignerAddr,
+        nonce: GHO_GSM.nonces(gsmSignerAddr),
+        deadline: deadline
+      })
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(gsmSignerKey, digest);
     bytes memory signature = abi.encodePacked(r, s, v);
@@ -320,19 +320,14 @@ contract TestGsm is TestGhoBase {
   function testRevertSellAssetWithSigInvalidSignature() public {
     uint256 deadline = block.timestamp + 1 hours;
 
-    bytes32 digest = keccak256(
-      abi.encode(
-        '\x19\x01',
-        GHO_GSM.DOMAIN_SEPARATOR(),
-        GSM_SELL_ASSET_WITH_SIG_TYPEHASH,
-        abi.encode(
-          gsmSignerAddr,
-          DEFAULT_GSM_USDX_AMOUNT,
-          gsmSignerAddr,
-          GHO_GSM.nonces(gsmSignerAddr),
-          deadline
-        )
-      )
+    bytes32 digest = _getSellAssetTypedDataHash(
+      EIP712Types.SellAssetWithSig({
+        originator: gsmSignerAddr,
+        maxAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: gsmSignerAddr,
+        nonce: GHO_GSM.nonces(gsmSignerAddr),
+        deadline: deadline
+      })
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(gsmSignerKey, digest);
     bytes memory signature = abi.encodePacked(r, s, v);
@@ -602,19 +597,14 @@ contract TestGsm is TestGhoBase {
 
     assertEq(GHO_GSM.nonces(gsmSignerAddr), 0, 'Unexpected before gsmSignerAddr nonce');
 
-    bytes32 digest = keccak256(
-      abi.encode(
-        '\x19\x01',
-        GHO_GSM.DOMAIN_SEPARATOR(),
-        GSM_BUY_ASSET_WITH_SIG_TYPEHASH,
-        abi.encode(
-          gsmSignerAddr,
-          DEFAULT_GSM_USDX_AMOUNT,
-          gsmSignerAddr,
-          GHO_GSM.nonces(gsmSignerAddr),
-          deadline
-        )
-      )
+    bytes32 digest = _getBuyAssetTypedDataHash(
+      EIP712Types.BuyAssetWithSig({
+        originator: gsmSignerAddr,
+        minAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: gsmSignerAddr,
+        nonce: GHO_GSM.nonces(gsmSignerAddr),
+        deadline: deadline
+      })
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(gsmSignerKey, digest);
     bytes memory signature = abi.encodePacked(r, s, v);
@@ -675,19 +665,14 @@ contract TestGsm is TestGhoBase {
 
     assertEq(GHO_GSM.nonces(gsmSignerAddr), 0, 'Unexpected before gsmSignerAddr nonce');
 
-    bytes32 digest = keccak256(
-      abi.encode(
-        '\x19\x01',
-        GHO_GSM.DOMAIN_SEPARATOR(),
-        GSM_BUY_ASSET_WITH_SIG_TYPEHASH,
-        abi.encode(
-          gsmSignerAddr,
-          DEFAULT_GSM_USDX_AMOUNT,
-          gsmSignerAddr,
-          GHO_GSM.nonces(gsmSignerAddr),
-          deadline
-        )
-      )
+    bytes32 digest = _getBuyAssetTypedDataHash(
+      EIP712Types.BuyAssetWithSig({
+        originator: gsmSignerAddr,
+        minAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: gsmSignerAddr,
+        nonce: GHO_GSM.nonces(gsmSignerAddr),
+        deadline: deadline
+      })
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(gsmSignerKey, digest);
     bytes memory signature = abi.encodePacked(r, s, v);
@@ -773,19 +758,14 @@ contract TestGsm is TestGhoBase {
   function testRevertBuyAssetWithSigExpiredSignature() public {
     uint256 deadline = block.timestamp - 1;
 
-    bytes32 digest = keccak256(
-      abi.encode(
-        '\x19\x01',
-        GHO_GSM.DOMAIN_SEPARATOR(),
-        GSM_BUY_ASSET_WITH_SIG_TYPEHASH,
-        abi.encode(
-          gsmSignerAddr,
-          DEFAULT_GSM_USDX_AMOUNT,
-          gsmSignerAddr,
-          GHO_GSM.nonces(gsmSignerAddr),
-          deadline
-        )
-      )
+    bytes32 digest = _getBuyAssetTypedDataHash(
+      EIP712Types.BuyAssetWithSig({
+        originator: gsmSignerAddr,
+        minAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: gsmSignerAddr,
+        nonce: GHO_GSM.nonces(gsmSignerAddr),
+        deadline: deadline
+      })
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(gsmSignerKey, digest);
     bytes memory signature = abi.encodePacked(r, s, v);
@@ -806,19 +786,14 @@ contract TestGsm is TestGhoBase {
   function testRevertBuyAssetWithSigInvalidSignature() public {
     uint256 deadline = block.timestamp + 1 hours;
 
-    bytes32 digest = keccak256(
-      abi.encode(
-        '\x19\x01',
-        GHO_GSM.DOMAIN_SEPARATOR(),
-        GSM_BUY_ASSET_WITH_SIG_TYPEHASH,
-        abi.encode(
-          gsmSignerAddr,
-          DEFAULT_GSM_USDX_AMOUNT,
-          gsmSignerAddr,
-          GHO_GSM.nonces(gsmSignerAddr),
-          deadline
-        )
-      )
+    bytes32 digest = _getBuyAssetTypedDataHash(
+      EIP712Types.BuyAssetWithSig({
+        originator: gsmSignerAddr,
+        minAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: gsmSignerAddr,
+        nonce: GHO_GSM.nonces(gsmSignerAddr),
+        deadline: deadline
+      })
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(gsmSignerKey, digest);
     bytes memory signature = abi.encodePacked(r, s, v);
