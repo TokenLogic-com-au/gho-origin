@@ -86,7 +86,7 @@ contract OracleSwapFreezer is AutomationCompatibleInterface {
   }
 
   /// @inheritdoc AutomationCompatibleInterface
-  function checkUpkeep(bytes calldata) external view returns (bool, bytes memory) {
+  function checkUpkeep(bytes calldata) public virtual view returns (bool, bytes memory) {
     return (_getAction() == Action.NONE ? false : true, '');
   }
 
