@@ -13,7 +13,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
 
   function setUp() public {
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), 1e8);
-    swapFreezer = new OracleSwapFreezer(
+    swapFreezer = _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -28,7 +28,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
 
   function testRevertConstructorInvalidZeroAddress() public {
     vm.expectRevert('ZERO_ADDRESS_NOT_VALID');
-    new OracleSwapFreezer(
+    _instantiateOracle(
       GHO_GSM,
       address(0),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -46,7 +46,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
 
     // Ensure bound check fails if allowing unfreezing, as expected
     vm.expectRevert('BOUNDS_NOT_VALID');
-    new OracleSwapFreezer(
+    _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -60,7 +60,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
     // Revert expected when non-zero unfreeze lower bound
     unfreezeUpperBound = 0;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    new OracleSwapFreezer(
+    _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -75,7 +75,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
     unfreezeLowerBound = 0;
     unfreezeUpperBound = type(uint128).max;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    new OracleSwapFreezer(
+    _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -89,7 +89,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
     // No revert expected with 0 unfreeze lower/upper bound
     unfreezeLowerBound = 0;
     unfreezeUpperBound = 0;
-    new OracleSwapFreezer(
+    _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -106,7 +106,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
     uint128 freezeLowerBound = DEFAULT_FREEZE_LOWER_BOUND;
     uint128 freezeUpperBound = DEFAULT_FREEZE_LOWER_BOUND;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    new OracleSwapFreezer(
+    _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -121,7 +121,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
     uint128 unfreezeLowerBound = DEFAULT_UNFREEZE_UPPER_BOUND;
     uint128 unfreezeUpperBound = DEFAULT_UNFREEZE_UPPER_BOUND;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    new OracleSwapFreezer(
+    _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -136,7 +136,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
     freezeLowerBound = DEFAULT_UNFREEZE_LOWER_BOUND;
     freezeUpperBound = DEFAULT_FREEZE_UPPER_BOUND;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    new OracleSwapFreezer(
+    _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -151,7 +151,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
     unfreezeLowerBound = DEFAULT_UNFREEZE_LOWER_BOUND;
     unfreezeUpperBound = DEFAULT_FREEZE_UPPER_BOUND;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    new OracleSwapFreezer(
+    _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -164,20 +164,20 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
   }
 
   function testCheckUpkeepCanFreeze() public {
-    (bool canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    bool canPerformUpkeep = _checkAutomation(swapFreezer);
     assertEq(canPerformUpkeep, false, 'Unexpected initial upkeep state');
 
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), DEFAULT_FREEZE_LOWER_BOUND);
-    (canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    canPerformUpkeep = _checkAutomation(swapFreezer);
     assertEq(canPerformUpkeep, true, 'Unexpected upkeep state after price == freeze lower bound');
 
     assertLt(1, DEFAULT_FREEZE_LOWER_BOUND, '1 not less than freeze lower bound');
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), 1);
-    (canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    canPerformUpkeep = _checkAutomation(swapFreezer);
     assertEq(canPerformUpkeep, true, 'Unexpected upkeep state after price < freeze lower bound');
 
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), DEFAULT_FREEZE_UPPER_BOUND);
-    (canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    canPerformUpkeep = _checkAutomation(swapFreezer);
     assertEq(canPerformUpkeep, true, 'Unexpected upkeep state after price == freeze upper bound');
 
     assertGt(
@@ -186,17 +186,17 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
       'uint128.max not greater than freeze upper bound'
     );
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), type(uint128).max);
-    (canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    canPerformUpkeep = _checkAndPerformAutomation(swapFreezer);
     assertEq(canPerformUpkeep, true, 'Unexpected upkeep state after price > freeze upper bound');
   }
 
   function testCheckUpkeepCannotFreezeWhenOracleZero() public {
-    (bool canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    bool canPerformUpkeep = _checkAndPerformAutomation(swapFreezer);
     assertEq(canPerformUpkeep, false, 'Unexpected initial upkeep state');
 
     assertLt(0, DEFAULT_FREEZE_LOWER_BOUND, '0 not less than freeze lower bound');
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), 0);
-    (canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    canPerformUpkeep = _checkAndPerformAutomation(swapFreezer);
     assertEq(canPerformUpkeep, false, 'Unexpected upkeep state when oracle price is zero');
   }
 
@@ -208,27 +208,27 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
     GHO_GSM.setSwapFreeze(true);
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), 1);
 
-    (bool canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    bool canPerformUpkeep = _checkAutomation(swapFreezer);
     assertEq(canPerformUpkeep, false, 'Unexpected initial upkeep state');
 
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), DEFAULT_UNFREEZE_LOWER_BOUND);
-    (canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    canPerformUpkeep = _checkAutomation(swapFreezer);
     assertEq(canPerformUpkeep, true, 'Unexpected upkeep state after price >= unfreeze lower bound');
 
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), DEFAULT_UNFREEZE_UPPER_BOUND);
-    (canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    canPerformUpkeep = _checkAutomation(swapFreezer);
     assertEq(canPerformUpkeep, true, 'Unexpected upkeep state after price <= unfreeze upper bound');
 
     PRICE_ORACLE.setAssetPrice(
       address(USDX_TOKEN),
       (DEFAULT_UNFREEZE_LOWER_BOUND + DEFAULT_UNFREEZE_UPPER_BOUND) / 2
     );
-    (canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    canPerformUpkeep = _checkAutomation(swapFreezer);
     assertEq(canPerformUpkeep, true, 'Unexpected upkeep state after price in unfreeze bound range');
   }
 
   function testCheckUpkeepCannotUnfreeze() public {
-    OracleSwapFreezer swapFreezerWithoutUnfreeze = new OracleSwapFreezer(
+    OracleSwapFreezer swapFreezerWithoutUnfreeze = _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -245,17 +245,17 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
     emit SwapFreeze(address(GHO_GSM_SWAP_FREEZER), true);
     GHO_GSM.setSwapFreeze(true);
 
-    (bool canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    bool canPerformUpkeep = _checkAndPerformAutomation(swapFreezer);
     assertEq(canPerformUpkeep, true, 'Unexpected upkeep state for default freezer');
 
-    (canPerformUpkeep, ) = swapFreezerWithoutUnfreeze.checkUpkeep('');
+    canPerformUpkeep = _checkAndPerformAutomation(swapFreezerWithoutUnfreeze);
     assertEq(canPerformUpkeep, false, 'Unexpected upkeep state for no-unfreeze freezer');
   }
 
   function testCheckUpkeepCannotUnfreezeWhenSeized() public {
     // Set oracle price to a value allowing a freeze
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), DEFAULT_FREEZE_LOWER_BOUND);
-    (bool canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    bool canPerformUpkeep = _checkAndPerformAutomation(swapFreezer);
     assertEq(canPerformUpkeep, true, 'Unexpected initial upkeep state for default freezer');
 
     // Seize the GSM
@@ -264,19 +264,19 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
     emit Seized(address(GHO_GSM_LAST_RESORT_LIQUIDATOR), TREASURY, 0, 0);
     GHO_GSM.seize();
 
-    (canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    canPerformUpkeep = _checkAndPerformAutomation(swapFreezer);
     assertEq(canPerformUpkeep, false, 'Unexpected upkeep state post-seize');
   }
 
   function testPerformUpkeepCanFreeze() public {
-    (bool canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    bool canPerformUpkeep = _checkAndPerformAutomation(swapFreezer);
     assertEq(canPerformUpkeep, false, 'Unexpected initial upkeep state');
     assertEq(GHO_GSM.getIsFrozen(), false, 'Unexpected initial freeze state for GSM');
 
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), DEFAULT_FREEZE_LOWER_BOUND);
     vm.expectEmit(address(GHO_GSM));
     emit SwapFreeze(address(swapFreezer), true);
-    swapFreezer.performUpkeep('');
+    _checkAndPerformAutomation(swapFreezer);
 
     assertEq(GHO_GSM.getIsFrozen(), true, 'Unexpected final freeze state for GSM');
   }
@@ -289,14 +289,14 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
     GHO_GSM.setSwapFreeze(true);
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), 1);
 
-    (bool canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    bool canPerformUpkeep = _checkAndPerformAutomation(swapFreezer);
     assertEq(canPerformUpkeep, false, 'Unexpected initial upkeep state');
     assertEq(GHO_GSM.getIsFrozen(), true, 'Unexpected initial freeze state for GSM');
 
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), DEFAULT_UNFREEZE_LOWER_BOUND);
     vm.expectEmit(address(GHO_GSM));
     emit SwapFreeze(address(swapFreezer), false);
-    swapFreezer.performUpkeep('');
+    _checkAndPerformAutomation(swapFreezer);
 
     assertEq(GHO_GSM.getIsFrozen(), false, 'Unexpected final freeze state for GSM');
   }
@@ -304,22 +304,22 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
   function testCheckUpkeepNoSwapFreezeRole() public {
     // Move price outside freeze range
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), DEFAULT_FREEZE_LOWER_BOUND - 1);
-    (bool canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    bool canPerformUpkeep = _checkAndPerformAutomation(swapFreezer);
     assertEq(canPerformUpkeep, true, 'Unexpected initial upkeep state');
 
     // Revoke SwapFreezer role
     GHO_GSM.revokeRole(GSM_SWAP_FREEZER_ROLE, address(swapFreezer));
 
     // Upkeep shouldn't be possible
-    (canPerformUpkeep, ) = swapFreezer.checkUpkeep('');
+    canPerformUpkeep = _checkAndPerformAutomation(swapFreezer);
     assertEq(canPerformUpkeep, false, 'Unexpected upkeep state');
     // Do not revert, it's a no-op execution
-    swapFreezer.performUpkeep('');
+    _checkAndPerformAutomation(swapFreezer);
   }
 
   function testGetCanUnfreeze() public {
     assertEq(swapFreezer.getCanUnfreeze(), true, 'Unexpected initial unfreeze state');
-    swapFreezer = new OracleSwapFreezer(
+    swapFreezer = _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -334,7 +334,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
 
   function testFuzzUpkeepConsistency(uint256 assetPrice, bool grantRole) public {
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), assetPrice);
-    OracleSwapFreezer agent = new OracleSwapFreezer(
+    OracleSwapFreezer agent = _instantiateOracle(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -350,9 +350,7 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
 
     // If canPerformUpkeep, there must be a state change
     bool freezeState = GHO_GSM.getIsFrozen();
-    (bool canPerformUpkeep, ) = agent.checkUpkeep('');
-
-    agent.performUpkeep('');
+    bool canPerformUpkeep = _checkAndPerformAutomation(agent);
     if (canPerformUpkeep) {
       // state change
       assertEq(freezeState, !GHO_GSM.getIsFrozen(), 'no state change after performUpkeep');
@@ -360,5 +358,50 @@ contract TestGsmOracleSwapFreezer is TestGhoBase {
       // no state change
       assertEq(freezeState, GHO_GSM.getIsFrozen(), 'state change after performUpkeep');
     }
+  }
+
+  function _checkAutomation(OracleSwapFreezer _swapFreezer) internal view virtual returns (bool) {
+    (bool shouldRunKeeper, ) = _swapFreezer.checkUpkeep('');
+    return shouldRunKeeper;
+  }
+
+  function _checkAndPerformAutomation(
+    OracleSwapFreezer _swapFreezer
+  ) internal virtual returns (bool) {
+    (bool shouldRunKeeper, bytes memory performData) = _swapFreezer.checkUpkeep('');
+    if (shouldRunKeeper) {
+      _swapFreezer.performUpkeep(performData);
+    }
+    return shouldRunKeeper;
+  }
+
+  function _performAutomation(
+    OracleSwapFreezer _swapFreezer,
+    bytes memory performData
+  ) internal virtual {
+    _swapFreezer.performUpkeep(performData);
+  }
+
+  function _instantiateOracle(
+    IGsm gsm,
+    address underlyingAsset,
+    IPoolAddressesProvider addressProvider,
+    uint128 freezeLowerBound,
+    uint128 freezeUpperBound,
+    uint128 unfreezeLowerBound,
+    uint128 unfreezeUpperBound,
+    bool allowUnfreeze
+  ) internal virtual returns (OracleSwapFreezer) {
+    return
+      new OracleSwapFreezer(
+        gsm,
+        underlyingAsset,
+        addressProvider,
+        freezeLowerBound,
+        freezeUpperBound,
+        unfreezeLowerBound,
+        unfreezeUpperBound,
+        allowUnfreeze
+      );
   }
 }
