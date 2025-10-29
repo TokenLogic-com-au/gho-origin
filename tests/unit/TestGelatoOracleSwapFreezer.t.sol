@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import './TestOracleSwapFreezerBase.t.sol';
 import {Address} from 'openzeppelin-contracts/contracts/utils/Address.sol';
-import {TestGsmOracleSwapFreezer} from './TestGsmOracleSwapFreezer.t.sol';
 import {IGsm} from 'src/contracts/facilitators/gsm/interfaces/IGsm.sol';
 import {IPoolAddressesProvider} from 'aave-v3-origin/contracts/interfaces/IPoolAddressesProvider.sol';
 import {GelatoOracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/GelatoOracleSwapFreezer.sol';
 import {OracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/OracleSwapFreezer.sol';
 
-contract TestGsmGelatoOracleSwapFreezer is TestGsmOracleSwapFreezer {
+contract TestGsmGelatoOracleSwapFreezer is TestOracleSwapFreezerBase {
   using Address for address;
 
   function _checkAndPerformAutomation(
@@ -28,7 +28,7 @@ contract TestGsmGelatoOracleSwapFreezer is TestGsmOracleSwapFreezer {
     address(_swapFreezer).functionCall(encodedCalldata);
   }
 
-  function _instantiateOracle(
+  function _deployOracle(
     IGsm gsm,
     address underlyingAsset,
     IPoolAddressesProvider addressProvider,
