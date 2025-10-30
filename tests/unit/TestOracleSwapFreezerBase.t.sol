@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 import './TestGhoBase.t.sol';
-import {OracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/OracleSwapFreezer.sol';
+import {OracleSwapFreezerBase} from 'src/contracts/facilitators/gsm/swapFreezer/OracleSwapFreezerBase.sol';
 
 abstract contract TestOracleSwapFreezerBase is TestGhoBase {
-  OracleSwapFreezer swapFreezer;
+  OracleSwapFreezerBase swapFreezer;
   uint128 constant DEFAULT_FREEZE_LOWER_BOUND = 0.97e8;
   uint128 constant DEFAULT_FREEZE_UPPER_BOUND = 1.03e8;
   uint128 constant DEFAULT_UNFREEZE_LOWER_BOUND = 0.99e8;
@@ -13,7 +13,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
 
   function setUp() public {
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), 1e8);
-    swapFreezer = _deployOracle(
+    swapFreezer = _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -28,7 +28,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
 
   function testRevertConstructorInvalidZeroAddress() public {
     vm.expectRevert('ZERO_ADDRESS_NOT_VALID');
-    _deployOracle(
+    _deployOracleSwapFreezer(
       GHO_GSM,
       address(0),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -46,7 +46,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
 
     // Ensure bound check fails if allowing unfreezing, as expected
     vm.expectRevert('BOUNDS_NOT_VALID');
-    _deployOracle(
+    _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -60,7 +60,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
     // Revert expected when non-zero unfreeze lower bound
     unfreezeUpperBound = 0;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    _deployOracle(
+    _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -75,7 +75,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
     unfreezeLowerBound = 0;
     unfreezeUpperBound = type(uint128).max;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    _deployOracle(
+    _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -89,7 +89,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
     // No revert expected with 0 unfreeze lower/upper bound
     unfreezeLowerBound = 0;
     unfreezeUpperBound = 0;
-    _deployOracle(
+    _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -106,7 +106,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
     uint128 freezeLowerBound = DEFAULT_FREEZE_LOWER_BOUND;
     uint128 freezeUpperBound = DEFAULT_FREEZE_LOWER_BOUND;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    _deployOracle(
+    _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -121,7 +121,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
     uint128 unfreezeLowerBound = DEFAULT_UNFREEZE_UPPER_BOUND;
     uint128 unfreezeUpperBound = DEFAULT_UNFREEZE_UPPER_BOUND;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    _deployOracle(
+    _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -136,7 +136,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
     freezeLowerBound = DEFAULT_UNFREEZE_LOWER_BOUND;
     freezeUpperBound = DEFAULT_FREEZE_UPPER_BOUND;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    _deployOracle(
+    _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -151,7 +151,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
     unfreezeLowerBound = DEFAULT_UNFREEZE_LOWER_BOUND;
     unfreezeUpperBound = DEFAULT_FREEZE_UPPER_BOUND;
     vm.expectRevert('BOUNDS_NOT_VALID');
-    _deployOracle(
+    _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -228,7 +228,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
   }
 
   function testCheckUpkeepCannotUnfreeze() public {
-    OracleSwapFreezer swapFreezerWithoutUnfreeze = _deployOracle(
+    OracleSwapFreezerBase swapFreezerWithoutUnfreeze = _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -319,7 +319,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
 
   function testGetCanUnfreeze() public {
     assertEq(swapFreezer.getCanUnfreeze(), true, 'Unexpected initial unfreeze state');
-    swapFreezer = _deployOracle(
+    swapFreezer = _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -334,7 +334,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
 
   function testFuzzUpkeepConsistency(uint256 assetPrice, bool grantRole) public {
     PRICE_ORACLE.setAssetPrice(address(USDX_TOKEN), assetPrice);
-    OracleSwapFreezer agent = _deployOracle(
+    OracleSwapFreezerBase agent = _deployOracleSwapFreezer(
       GHO_GSM,
       address(USDX_TOKEN),
       IPoolAddressesProvider(address(PROVIDER)),
@@ -360,21 +360,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
     }
   }
 
-  function _checkAutomation(OracleSwapFreezer _swapFreezer) internal view virtual returns (bool) {
-    (bool shouldRunKeeper, ) = _swapFreezer.checkUpkeep('');
-    return shouldRunKeeper;
-  }
-
-  function _checkAndPerformAutomation(
-    OracleSwapFreezer _swapFreezer
-  ) internal virtual returns (bool);
-
-  function _performAutomation(
-    OracleSwapFreezer _swapFreezer,
-    bytes memory performData
-  ) internal virtual;
-
-  function _deployOracle(
+  function _deployOracleSwapFreezer(
     IGsm gsm,
     address underlyingAsset,
     IPoolAddressesProvider addressProvider,
@@ -383,5 +369,21 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
     uint128 unfreezeLowerBound,
     uint128 unfreezeUpperBound,
     bool allowUnfreeze
-  ) internal virtual returns (OracleSwapFreezer);
+  ) internal virtual returns (OracleSwapFreezerBase);
+
+  function _checkAutomation(
+    OracleSwapFreezerBase _swapFreezer
+  ) internal view virtual returns (bool) {
+    (bool shouldRunKeeper, ) = _swapFreezer.checkUpkeep('');
+    return shouldRunKeeper;
+  }
+
+  function _checkAndPerformAutomation(
+    OracleSwapFreezerBase _swapFreezer
+  ) internal virtual returns (bool);
+
+  function _performAutomation(
+    OracleSwapFreezerBase _swapFreezer,
+    bytes memory performData
+  ) internal virtual;
 }

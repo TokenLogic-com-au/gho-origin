@@ -2,14 +2,15 @@
 pragma solidity ^0.8.10;
 
 import {IPoolAddressesProvider} from 'aave-v3-origin/contracts/interfaces/IPoolAddressesProvider.sol';
-import {OracleSwapFreezerBase} from 'src/contracts/facilitators/gsm/swapFreezer/OracleSwapFreezerBase.sol';
+import {AutomationCompatibleInterface} from 'src/contracts/dependencies/chainlink/AutomationCompatibleInterface.sol';
 import {IGsm} from 'src/contracts/facilitators/gsm/interfaces/IGsm.sol';
+import {OracleSwapFreezerBase} from 'src/contracts/facilitators/gsm/swapFreezer/OracleSwapFreezerBase.sol';
 
 /**
- * @title GelatoOracleSwapFreezer
- * @notice Gelato-compatible automated swap freezer for GSM.
+ * @title ChainlinkOracleSwapFreezer
+ * @notice Chainlink-compatible automated swap freezer for GSM.
  */
-contract GelatoOracleSwapFreezer is OracleSwapFreezerBase {
+contract ChainlinkOracleSwapFreezer is OracleSwapFreezerBase {
   /**
    * @dev Constructor
    * @dev Freeze/unfreeze bounds are specified in USD with 8-decimal precision, like Aave v3 Price Oracles
@@ -46,13 +47,8 @@ contract GelatoOracleSwapFreezer is OracleSwapFreezerBase {
     )
   {}
 
-  /**
-   * @notice Returns whether the action can be performed and the encoded call data for execution.
-   * @return True if the action can be performed, false otherwise.
-   * @return The encoded call data for the action to be executed.
-   */
-
+  /// @inheritdoc AutomationCompatibleInterface
   function checkUpkeep(bytes calldata) external view override returns (bool, bytes memory) {
-    return (_getAction() == Action.NONE ? false : true, abi.encodeCall(this.performUpkeep, ''));
+    return (_getAction() == Action.NONE ? false : true, '');
   }
 }
