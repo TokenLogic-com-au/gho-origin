@@ -6,29 +6,21 @@ import {Address} from 'openzeppelin-contracts/contracts/utils/Address.sol';
 import {IGsm} from 'src/contracts/facilitators/gsm/interfaces/IGsm.sol';
 import {IPoolAddressesProvider} from 'aave-v3-origin/contracts/interfaces/IPoolAddressesProvider.sol';
 import {GelatoOracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/GelatoOracleSwapFreezer.sol';
-import {OracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/OracleSwapFreezer.sol';
+import {OracleSwapFreezerBase} from 'src/contracts/facilitators/gsm/swapFreezer/OracleSwapFreezerBase.sol';
 
 contract TestGsmGelatoOracleSwapFreezer is TestOracleSwapFreezerBase {
   using Address for address;
 
-  function _checkAndPerformAutomation(
-    OracleSwapFreezer _swapFreezer
-  ) internal virtual override returns (bool) {
-    (bool shouldRunKeeper, bytes memory encodedPerformData) = _swapFreezer.checkUpkeep('');
-    if (shouldRunKeeper) {
-      address(_swapFreezer).functionCall(encodedPerformData);
+  function testCheckUpkeepReturnsCorrectSelector() public view {
+    (, bytes memory data) = swapFreezer.checkUpkeep('');
+    bytes4 selector;
+    assembly {
+      selector := mload(add(data, 32))
     }
-    return shouldRunKeeper;
+    assertEq(selector, OracleSwapFreezerBase.performUpkeep.selector);
   }
 
-  function _performAutomation(
-    OracleSwapFreezer _swapFreezer,
-    bytes memory encodedCalldata
-  ) internal override {
-    address(_swapFreezer).functionCall(encodedCalldata);
-  }
-
-  function _deployOracle(
+  function _deployOracleSwapFreezer(
     IGsm gsm,
     address underlyingAsset,
     IPoolAddressesProvider addressProvider,
@@ -37,7 +29,7 @@ contract TestGsmGelatoOracleSwapFreezer is TestOracleSwapFreezerBase {
     uint128 unfreezeLowerBound,
     uint128 unfreezeUpperBound,
     bool allowUnfreeze
-  ) internal override returns (OracleSwapFreezer) {
+  ) internal override returns (OracleSwapFreezerBase) {
     return
       new GelatoOracleSwapFreezer(
         gsm,
@@ -49,5 +41,22 @@ contract TestGsmGelatoOracleSwapFreezer is TestOracleSwapFreezerBase {
         unfreezeUpperBound,
         allowUnfreeze
       );
+  }
+
+  function _checkAndPerformAutomation(
+    OracleSwapFreezerBase _swapFreezer
+  ) internal virtual override returns (bool) {
+    (bool shouldRunKeeper, bytes memory encodedPerformData) = _swapFreezer.checkUpkeep('');
+    if (shouldRunKeeper) {
+      address(_swapFreezer).functionCall(encodedPerformData);
+    }
+    return shouldRunKeeper;
+  }
+
+  function _performAutomation(
+    OracleSwapFreezerBase _swapFreezer,
+    bytes memory encodedCalldata
+  ) internal override {
+    address(_swapFreezer).functionCall(encodedCalldata);
   }
 }

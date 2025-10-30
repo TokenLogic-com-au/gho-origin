@@ -7,14 +7,14 @@ import {AutomationCompatibleInterface} from 'src/contracts/dependencies/chainlin
 import {IGsm} from 'src/contracts/facilitators/gsm/interfaces/IGsm.sol';
 
 /**
- * @title OracleSwapFreezer
+ * @title OracleSwapFreezerBase
  * @author Aave
  * @notice Swap freezer that enacts the freeze action based on underlying oracle price, GSM's state and predefined price boundaries
- * @dev Chainlink Automation-compatible contract using Aave V3 Price Oracle, where prices are USD denominated with 8-decimal precision
+ * @dev It uses Aave V3 Price Oracle, where prices are USD denominated with 8-decimal precision
  * @dev Freeze action is executable if GSM is not seized, not frozen and price is outside of the freeze bounds
  * @dev Unfreeze action is executable if GSM is not seized, frozen, unfreezing is allowed and price is inside the unfreeze bounds
  */
-contract OracleSwapFreezer is AutomationCompatibleInterface {
+abstract contract OracleSwapFreezerBase is AutomationCompatibleInterface {
   enum Action {
     NONE,
     FREEZE,
@@ -86,9 +86,7 @@ contract OracleSwapFreezer is AutomationCompatibleInterface {
   }
 
   /// @inheritdoc AutomationCompatibleInterface
-  function checkUpkeep(bytes calldata) public view virtual returns (bool, bytes memory) {
-    return (_getAction() == Action.NONE ? false : true, '');
-  }
+  function checkUpkeep(bytes calldata) external view virtual returns (bool, bytes memory);
 
   /**
    * @notice Returns whether or not the swap freezer can unfreeze a GSM
