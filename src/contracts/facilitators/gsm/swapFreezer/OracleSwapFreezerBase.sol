@@ -3,7 +3,6 @@ pragma solidity ^0.8.10;
 
 import {IPoolAddressesProvider} from 'aave-v3-origin/contracts/interfaces/IPoolAddressesProvider.sol';
 import {IPriceOracle} from 'aave-v3-origin/contracts/interfaces/IPriceOracle.sol';
-import {AutomationCompatibleInterface} from 'src/contracts/dependencies/chainlink/AutomationCompatibleInterface.sol';
 import {IGsm} from 'src/contracts/facilitators/gsm/interfaces/IGsm.sol';
 
 /**
@@ -14,7 +13,7 @@ import {IGsm} from 'src/contracts/facilitators/gsm/interfaces/IGsm.sol';
  * @dev Freeze action is executable if GSM is not seized, not frozen and price is outside of the freeze bounds
  * @dev Unfreeze action is executable if GSM is not seized, frozen, unfreezing is allowed and price is inside the unfreeze bounds
  */
-abstract contract OracleSwapFreezerBase is AutomationCompatibleInterface {
+abstract contract OracleSwapFreezerBase {
   enum Action {
     NONE,
     FREEZE,
@@ -74,19 +73,6 @@ abstract contract OracleSwapFreezerBase is AutomationCompatibleInterface {
     _unfreezeUpperBound = unfreezeUpperBound;
     _allowUnfreeze = allowUnfreeze;
   }
-
-  /// @inheritdoc AutomationCompatibleInterface
-  function performUpkeep(bytes calldata) external {
-    Action action = _getAction();
-    if (action == Action.FREEZE) {
-      GSM.setSwapFreeze(true);
-    } else if (action == Action.UNFREEZE) {
-      GSM.setSwapFreeze(false);
-    }
-  }
-
-  /// @inheritdoc AutomationCompatibleInterface
-  function checkUpkeep(bytes calldata) external view virtual returns (bool, bytes memory);
 
   /**
    * @notice Returns whether or not the swap freezer can unfreeze a GSM

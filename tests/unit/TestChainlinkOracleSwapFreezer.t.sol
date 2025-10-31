@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import './TestOracleSwapFreezerBase.t.sol';
-import {ChainlinkOracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/ChainlinkOracleSwapFreezer.sol';
 
 contract TestChainlinkOracleSwapFreezer is TestOracleSwapFreezerBase {
   function _deployOracleSwapFreezer(
@@ -26,6 +25,13 @@ contract TestChainlinkOracleSwapFreezer is TestOracleSwapFreezerBase {
         unfreezeUpperBound,
         allowUnfreeze
       );
+  }
+
+  function _checkAutomation(
+    OracleSwapFreezerBase _swapFreezer
+  ) internal view override returns (bool) {
+    (bool shouldRunKeeper, ) = _swapFreezer.checkUpkeep('');
+    return shouldRunKeeper;
   }
 
   function _checkAndPerformAutomation(

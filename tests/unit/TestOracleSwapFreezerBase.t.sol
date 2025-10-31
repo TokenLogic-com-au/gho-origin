@@ -373,10 +373,7 @@ abstract contract TestOracleSwapFreezerBase is TestGhoBase {
 
   function _checkAutomation(
     OracleSwapFreezerBase _swapFreezer
-  ) internal view virtual returns (bool) {
-    (bool shouldRunKeeper, ) = _swapFreezer.checkUpkeep('');
-    return shouldRunKeeper;
-  }
+  ) internal view virtual returns (bool);
 
   function _checkAndPerformAutomation(
     OracleSwapFreezerBase _swapFreezer
