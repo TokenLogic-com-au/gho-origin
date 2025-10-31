@@ -5,6 +5,10 @@ import 'forge-std/Test.sol';
 import 'forge-std/console2.sol';
 import {Vm} from 'forge-std/Vm.sol';
 
+// dependencies
+import {Address} from 'openzeppelin-contracts/contracts/utils/Address.sol';
+import {AutomationCompatibleInterface} from 'src/contracts/dependencies/chainlink/AutomationCompatibleInterface.sol';
+
 // helpers
 import {Constants} from '../helpers/Constants.sol';
 import {DebtUtils} from '../helpers/DebtUtils.sol';
@@ -83,8 +87,10 @@ import {GhoGsmSteward} from 'src/contracts/misc/GhoGsmSteward.sol';
 import {FixedFeeStrategyFactory} from 'src/contracts/facilitators/gsm/feeStrategy/FixedFeeStrategyFactory.sol';
 import {GhoReserve} from 'src/contracts/facilitators/gsm/GhoReserve.sol';
 import {OwnableFacilitator} from 'src/contracts/facilitators/gsm/OwnableFacilitator.sol';
+import {OracleSwapFreezerBase} from 'src/contracts/facilitators/gsm/swapFreezer/OracleSwapFreezerBase.sol';
 import {ChainlinkOracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/ChainlinkOracleSwapFreezer.sol';
 import {GelatoOracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/GelatoOracleSwapFreezer.sol';
+import {IGelatoOracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/interfaces/IGelatoOracleSwapFreezer.sol';
 
 // CCIP contracts
 import {MockUpgradeableLockReleaseTokenPool} from '../mocks/MockUpgradeableLockReleaseTokenPool.sol';

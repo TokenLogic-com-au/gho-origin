@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
-import {IPoolAddressesProvider} from 'aave-v3-origin/contracts/interfaces/IPoolAddressesProvider.sol';
 import {AutomationCompatibleInterface} from 'src/contracts/dependencies/chainlink/AutomationCompatibleInterface.sol';
+import {IPoolAddressesProvider} from 'aave-v3-origin/contracts/interfaces/IPoolAddressesProvider.sol';
 import {IGsm} from 'src/contracts/facilitators/gsm/interfaces/IGsm.sol';
 import {OracleSwapFreezerBase} from 'src/contracts/facilitators/gsm/swapFreezer/OracleSwapFreezerBase.sol';
 
@@ -18,7 +18,7 @@ contract ChainlinkOracleSwapFreezer is OracleSwapFreezerBase, AutomationCompatib
    * @dev All bound ranges are inclusive
    * @param gsm The GSM that this contract will trigger freezes/unfreezes on
    * @param underlyingAsset The address of the collateral asset
-   * @param addressProvider The Aave Addresses Provider for looking up the Price Oracle
+   * @param addressesProvider The Aave Addresses Provider for looking up the Price Oracle
    * @param freezeLowerBound The lower price bound for freeze operations
    * @param freezeUpperBound The upper price bound for freeze operations
    * @param unfreezeLowerBound The lower price bound for unfreeze operations, must be 0 if unfreezing not allowed
@@ -28,7 +28,7 @@ contract ChainlinkOracleSwapFreezer is OracleSwapFreezerBase, AutomationCompatib
   constructor(
     IGsm gsm,
     address underlyingAsset,
-    IPoolAddressesProvider addressProvider,
+    IPoolAddressesProvider addressesProvider,
     uint128 freezeLowerBound,
     uint128 freezeUpperBound,
     uint128 unfreezeLowerBound,
@@ -38,7 +38,7 @@ contract ChainlinkOracleSwapFreezer is OracleSwapFreezerBase, AutomationCompatib
     OracleSwapFreezerBase(
       gsm,
       underlyingAsset,
-      addressProvider,
+      addressesProvider,
       freezeLowerBound,
       freezeUpperBound,
       unfreezeLowerBound,
@@ -49,16 +49,11 @@ contract ChainlinkOracleSwapFreezer is OracleSwapFreezerBase, AutomationCompatib
 
   /// @inheritdoc AutomationCompatibleInterface
   function performUpkeep(bytes calldata) external {
-    Action action = _getAction();
-    if (action == Action.FREEZE) {
-      GSM.setSwapFreeze(true);
-    } else if (action == Action.UNFREEZE) {
-      GSM.setSwapFreeze(false);
-    }
+    _execute();
   }
 
   /// @inheritdoc AutomationCompatibleInterface
   function checkUpkeep(bytes calldata) external view returns (bool, bytes memory) {
-    return (_getAction() == Action.NONE ? false : true, '');
+    return (_checkExecute(), '');
   }
 }
