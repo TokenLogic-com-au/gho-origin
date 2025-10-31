@@ -10,7 +10,7 @@ import {OracleSwapFreezerBase} from 'src/contracts/facilitators/gsm/swapFreezer/
  * @title ChainlinkOracleSwapFreezer
  * @notice Chainlink-compatible automated swap freezer for GSM.
  */
-contract ChainlinkOracleSwapFreezer is OracleSwapFreezerBase {
+contract ChainlinkOracleSwapFreezer is OracleSwapFreezerBase, AutomationCompatibleInterface {
   /**
    * @dev Constructor
    * @dev Freeze/unfreeze bounds are specified in USD with 8-decimal precision, like Aave v3 Price Oracles
@@ -48,7 +48,17 @@ contract ChainlinkOracleSwapFreezer is OracleSwapFreezerBase {
   {}
 
   /// @inheritdoc AutomationCompatibleInterface
-  function checkUpkeep(bytes calldata) external view override returns (bool, bytes memory) {
+  function performUpkeep(bytes calldata) external {
+    Action action = _getAction();
+    if (action == Action.FREEZE) {
+      GSM.setSwapFreeze(true);
+    } else if (action == Action.UNFREEZE) {
+      GSM.setSwapFreeze(false);
+    }
+  }
+
+  /// @inheritdoc AutomationCompatibleInterface
+  function checkUpkeep(bytes calldata) external view returns (bool, bytes memory) {
     return (_getAction() == Action.NONE ? false : true, '');
   }
 }

@@ -47,12 +47,24 @@ contract GelatoOracleSwapFreezer is OracleSwapFreezerBase {
   {}
 
   /**
+   * @notice Executes a given action on the GSM depending on the oracle value
+   */
+  function execute(bytes calldata) external {
+    Action action = _getAction();
+    if (action == Action.FREEZE) {
+      GSM.setSwapFreeze(true);
+    } else if (action == Action.UNFREEZE) {
+      GSM.setSwapFreeze(false);
+    }
+  }
+
+  /**
    * @notice Returns whether the action can be performed and the encoded call data for execution.
    * @return True if the action can be performed, false otherwise.
    * @return The encoded call data for the action to be executed.
    */
 
-  function checkUpkeep(bytes calldata) external view override returns (bool, bytes memory) {
-    return (_getAction() == Action.NONE ? false : true, abi.encodeCall(this.performUpkeep, ''));
+  function checkExecute(bytes calldata) external view returns (bool, bytes memory) {
+    return (_getAction() == Action.NONE ? false : true, abi.encodeCall(this.execute, ''));
   }
 }

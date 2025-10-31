@@ -3,16 +3,12 @@ pragma solidity ^0.8.0;
 
 import './TestOracleSwapFreezerBase.t.sol';
 import {Address} from 'openzeppelin-contracts/contracts/utils/Address.sol';
-import {IGsm} from 'src/contracts/facilitators/gsm/interfaces/IGsm.sol';
-import {IPoolAddressesProvider} from 'aave-v3-origin/contracts/interfaces/IPoolAddressesProvider.sol';
-import {GelatoOracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/GelatoOracleSwapFreezer.sol';
-import {OracleSwapFreezerBase} from 'src/contracts/facilitators/gsm/swapFreezer/OracleSwapFreezerBase.sol';
 
 contract TestGsmGelatoOracleSwapFreezer is TestOracleSwapFreezerBase {
   using Address for address;
 
   function testCheckUpkeepReturnsCorrectSelector() public view {
-    (, bytes memory data) = swapFreezer.checkUpkeep('');
+    (, bytes memory data) = swapFreezer.checkExecute('');
     bytes4 selector;
     assembly {
       selector := mload(add(data, 32))
@@ -43,10 +39,17 @@ contract TestGsmGelatoOracleSwapFreezer is TestOracleSwapFreezerBase {
       );
   }
 
+  function _checkAutomation(
+    OracleSwapFreezerBase _swapFreezer
+  ) internal view override returns (bool) {
+    (bool shouldRunKeeper, ) = _swapFreezer.checkExecute('');
+    return shouldRunKeeper;
+  }
+
   function _checkAndPerformAutomation(
     OracleSwapFreezerBase _swapFreezer
   ) internal virtual override returns (bool) {
-    (bool shouldRunKeeper, bytes memory encodedPerformData) = _swapFreezer.checkUpkeep('');
+    (bool shouldRunKeeper, bytes memory encodedPerformData) = _swapFreezer.checkExecute('');
     if (shouldRunKeeper) {
       address(_swapFreezer).functionCall(encodedPerformData);
     }
