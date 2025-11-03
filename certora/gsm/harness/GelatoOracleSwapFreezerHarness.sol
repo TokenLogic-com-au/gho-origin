@@ -1,12 +1,12 @@
+// SPDX-License-Identifier: No-License
 pragma solidity ^0.8.0;
 
-import {OracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/OracleSwapFreezer.sol';
+import {GelatoOracleSwapFreezer} from 'src/contracts/facilitators/gsm/swapFreezer/GelatoOracleSwapFreezer.sol';
 import {IPoolAddressesProvider} from 'aave-v3-origin/contracts/interfaces/IPoolAddressesProvider.sol';
 import {IPriceOracle} from 'aave-v3-origin/contracts/interfaces/IPriceOracle.sol';
-//import {AutomationCompatibleInterface} from '../dependencies/chainlink/AutomationCompatibleInterface.sol';
 import {IGsm} from 'src/contracts/facilitators/gsm/interfaces/IGsm.sol';
 
-contract OracleSwapFreezerHarness is OracleSwapFreezer {
+contract GelatoOracleSwapFreezerHarness is GelatoOracleSwapFreezer {
   constructor(
     IGsm gsm,
     address underlyingAsset,
@@ -17,7 +17,7 @@ contract OracleSwapFreezerHarness is OracleSwapFreezer {
     uint128 unfreezeUpperBound,
     bool allowUnfreeze
   )
-    OracleSwapFreezer(
+    GelatoOracleSwapFreezer(
       gsm,
       underlyingAsset,
       addressProvider,
