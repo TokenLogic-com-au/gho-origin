@@ -3,18 +3,17 @@ pragma solidity ^0.8.10;
 
 import {IPoolAddressesProvider} from 'aave-v3-origin/contracts/interfaces/IPoolAddressesProvider.sol';
 import {IPriceOracle} from 'aave-v3-origin/contracts/interfaces/IPriceOracle.sol';
-import {AutomationCompatibleInterface} from 'src/contracts/dependencies/chainlink/AutomationCompatibleInterface.sol';
 import {IGsm} from 'src/contracts/facilitators/gsm/interfaces/IGsm.sol';
 
 /**
- * @title OracleSwapFreezer
+ * @title OracleSwapFreezerBase
  * @author Aave
  * @notice Swap freezer that enacts the freeze action based on underlying oracle price, GSM's state and predefined price boundaries
- * @dev Chainlink Automation-compatible contract using Aave V3 Price Oracle, where prices are USD denominated with 8-decimal precision
+ * @dev It uses Aave V3 Price Oracle, where prices are USD denominated with 8-decimal precision
  * @dev Freeze action is executable if GSM is not seized, not frozen and price is outside of the freeze bounds
  * @dev Unfreeze action is executable if GSM is not seized, frozen, unfreezing is allowed and price is inside the unfreeze bounds
  */
-contract OracleSwapFreezer is AutomationCompatibleInterface {
+abstract contract OracleSwapFreezerBase {
   enum Action {
     NONE,
     FREEZE,
@@ -37,7 +36,7 @@ contract OracleSwapFreezer is AutomationCompatibleInterface {
    * @dev All bound ranges are inclusive
    * @param gsm The GSM that this contract will trigger freezes/unfreezes on
    * @param underlyingAsset The address of the collateral asset
-   * @param addressProvider The Aave Addresses Provider for looking up the Price Oracle
+   * @param addressesProvider The Aave Addresses Provider for looking up the Price Oracle
    * @param freezeLowerBound The lower price bound for freeze operations
    * @param freezeUpperBound The upper price bound for freeze operations
    * @param unfreezeLowerBound The lower price bound for unfreeze operations, must be 0 if unfreezing not allowed
@@ -47,7 +46,7 @@ contract OracleSwapFreezer is AutomationCompatibleInterface {
   constructor(
     IGsm gsm,
     address underlyingAsset,
-    IPoolAddressesProvider addressProvider,
+    IPoolAddressesProvider addressesProvider,
     uint128 freezeLowerBound,
     uint128 freezeUpperBound,
     uint128 unfreezeLowerBound,
@@ -67,7 +66,7 @@ contract OracleSwapFreezer is AutomationCompatibleInterface {
     );
     GSM = gsm;
     UNDERLYING_ASSET = underlyingAsset;
-    ADDRESS_PROVIDER = addressProvider;
+    ADDRESS_PROVIDER = addressesProvider;
     _freezeLowerBound = freezeLowerBound;
     _freezeUpperBound = freezeUpperBound;
     _unfreezeLowerBound = unfreezeLowerBound;
@@ -75,8 +74,10 @@ contract OracleSwapFreezer is AutomationCompatibleInterface {
     _allowUnfreeze = allowUnfreeze;
   }
 
-  /// @inheritdoc AutomationCompatibleInterface
-  function performUpkeep(bytes calldata) external {
+  /**
+   * @dev Performs the swap freeze action depending on the oracle value
+   */
+  function _execute() internal {
     Action action = _getAction();
     if (action == Action.FREEZE) {
       GSM.setSwapFreeze(true);
@@ -85,9 +86,12 @@ contract OracleSwapFreezer is AutomationCompatibleInterface {
     }
   }
 
-  /// @inheritdoc AutomationCompatibleInterface
-  function checkUpkeep(bytes calldata) external view returns (bool, bytes memory) {
-    return (_getAction() == Action.NONE ? false : true, '');
+  /**
+   * @dev Returns whether the action can be performed
+   * @return True if the action can be performed, false otherwise.
+   */
+  function _checkExecute() internal view returns (bool) {
+    return _getAction() == Action.NONE ? false : true;
   }
 
   /**

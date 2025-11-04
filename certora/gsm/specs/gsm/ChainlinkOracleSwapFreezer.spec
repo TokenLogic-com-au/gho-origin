@@ -1,5 +1,5 @@
 
-// verifies properties of OracleSwapFreezer
+// verifies properties of ChainlinkOracleSwapFreezer
 
 methods {
 	function getFreezeBound() external returns (uint128, uint128) envfree;
