@@ -295,7 +295,7 @@ sGHO uses high-precision arithmetic to ensure accurate yield calculations and pr
 
 For a comprehensive analysis of precision handling, edge cases, and mathematical considerations, see the detailed precision analysis document:
 
-**[Precision Analysis](./docs/precision_analysis/PRECISION.md)**
+**[Precision Analysis](./docs/sgho-precision-analysis/precision.md)**
 
 This document covers:
 
