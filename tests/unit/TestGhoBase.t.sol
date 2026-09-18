@@ -367,7 +367,9 @@ contract TestGhoBase is
     uint128 exposureCap
   ) internal returns (Gsm4626) {
     Gsm4626 gsmImpl = _isPermissionedGsm()
-      ? Gsm4626(address(new PermissionedGsm4626(address(GHO_TOKEN), underlyingToken, priceStrategy)))
+      ? Gsm4626(
+        address(new PermissionedGsm4626(address(GHO_TOKEN), underlyingToken, priceStrategy))
+      )
       : new Gsm4626(address(GHO_TOKEN), underlyingToken, priceStrategy);
     AdminUpgradeabilityProxy gsmProxy = new AdminUpgradeabilityProxy(
       address(gsmImpl),

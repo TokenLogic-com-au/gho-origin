@@ -33,22 +33,16 @@ contract PermissionedGsm is Gsm {
   }
 
   /// @inheritdoc Gsm
-  function _buyAsset(
-    address originator,
-    uint256 minAmount,
-    address receiver
-  ) internal override returns (uint256, uint256) {
+  function _beforeBuyAsset(address originator, uint256 amount, address receiver) internal override {
     _checkRole(SWAPPER_ROLE, originator);
-    return super._buyAsset(originator, minAmount, receiver);
   }
 
   /// @inheritdoc Gsm
-  function _sellAsset(
+  function _beforeSellAsset(
     address originator,
-    uint256 maxAmount,
+    uint256 amount,
     address receiver
-  ) internal override returns (uint256, uint256) {
+  ) internal override {
     _checkRole(SWAPPER_ROLE, originator);
-    return super._sellAsset(originator, maxAmount, receiver);
   }
 }

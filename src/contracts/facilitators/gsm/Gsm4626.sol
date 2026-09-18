@@ -105,12 +105,12 @@ contract Gsm4626 is Gsm, IGsm4626 {
   }
 
   /// @inheritdoc Gsm
-  function _beforeBuyAsset(address, uint256, address) internal override {
+  function _beforeBuyAsset(address, uint256, address) internal virtual override {
     _cumulateYieldInGho();
   }
 
   /// @inheritdoc Gsm
-  function _beforeSellAsset(address, uint256, address) internal override {}
+  function _beforeSellAsset(address, uint256, address) internal virtual override {}
 
   /**
    * @dev Cumulates yield in form of GHO, aimed to be redirected to the treasury
