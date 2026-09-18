@@ -47,5 +47,6 @@ contract PermissionedGsm4626 is Gsm4626 {
     address receiver
   ) internal override {
     _checkRole(SWAPPER_ROLE, originator);
+    super._beforeSellAsset(originator, amount, receiver);
   }
 }

@@ -34,6 +34,13 @@ contract TestPermissionedGsmAccess is TestGhoBase {
     USDX_TOKEN.approve(address(GHO_GSM), DEFAULT_GSM_USDX_AMOUNT);
     GHO_GSM.sellAsset(DEFAULT_GSM_USDX_AMOUNT, ALICE);
     vm.stopPrank();
+
+    // Same for the 4626
+    _mintVaultAssets(USDX_4626_TOKEN, USDX_TOKEN, ALICE, DEFAULT_GSM_USDX_AMOUNT);
+    vm.startPrank(ALICE);
+    USDX_4626_TOKEN.approve(address(GHO_GSM_4626), DEFAULT_GSM_USDX_AMOUNT);
+    GHO_GSM_4626.sellAsset(DEFAULT_GSM_USDX_AMOUNT, ALICE);
+    vm.stopPrank();
   }
 
   function _isPermissionedGsm() internal pure override returns (bool) {
@@ -183,6 +190,180 @@ contract TestPermissionedGsmAccess is TestGhoBase {
       abi.encodePacked(r, s, v)
     );
     assertEq(assetAmount, DEFAULT_GSM_USDX_AMOUNT, 'Unexpected sold asset amount');
+  }
+
+  function testBuyAssetWithSigAuthorizedSignerUnauthorizedRelayer() public {
+    uint256 deadline = block.timestamp + 1 hours;
+    ghoFaucet(gsmSignerAddr, DEFAULT_GSM_GHO_AMOUNT * 2);
+    vm.prank(gsmSignerAddr);
+    GHO_TOKEN.approve(address(GHO_GSM), type(uint256).max);
+
+    bytes32 digest = _getBuyAssetTypedDataHash(
+      address(GHO_GSM),
+      EIP712Types.BuyAssetWithSig({
+        originator: gsmSignerAddr,
+        minAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: gsmSignerAddr,
+        nonce: GHO_GSM.nonces(gsmSignerAddr),
+        deadline: deadline
+      })
+    );
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(gsmSignerKey, digest);
+
+    assertTrue(
+      GHO_GSM.hasRole(GSM_SWAPPER_ROLE, gsmSignerAddr),
+      'Signer does not hold the Swapper Role'
+    );
+    assertFalse(
+      GHO_GSM.hasRole(GSM_SWAPPER_ROLE, unauthorizedAddr),
+      'Relayer unexpectedly holds the Swapper Role'
+    );
+
+    // The relayer holds no role, but the signed originator does
+    vm.prank(unauthorizedAddr);
+    (uint256 assetAmount, ) = GHO_GSM.buyAssetWithSig(
+      gsmSignerAddr,
+      DEFAULT_GSM_USDX_AMOUNT,
+      gsmSignerAddr,
+      deadline,
+      abi.encodePacked(r, s, v)
+    );
+    assertEq(assetAmount, DEFAULT_GSM_USDX_AMOUNT, 'Unexpected bought asset amount');
+  }
+
+  function testBuyAssetWithSig4626AuthorizedSignerUnauthorizedRelayer() public {
+    uint256 deadline = block.timestamp + 1 hours;
+
+    ghoFaucet(gsmSignerAddr, DEFAULT_GSM_GHO_AMOUNT * 2);
+    vm.prank(gsmSignerAddr);
+    GHO_TOKEN.approve(address(GHO_GSM_4626), type(uint256).max);
+
+    bytes32 digest = _getBuyAssetTypedDataHash(
+      address(GHO_GSM_4626),
+      EIP712Types.BuyAssetWithSig({
+        originator: gsmSignerAddr,
+        minAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: gsmSignerAddr,
+        nonce: GHO_GSM_4626.nonces(gsmSignerAddr),
+        deadline: deadline
+      })
+    );
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(gsmSignerKey, digest);
+
+    assertTrue(
+      GHO_GSM.hasRole(GSM_SWAPPER_ROLE, gsmSignerAddr),
+      'Signer does not hold the Swapper Role'
+    );
+    assertFalse(
+      GHO_GSM.hasRole(GSM_SWAPPER_ROLE, unauthorizedAddr),
+      'Relayer unexpectedly holds the Swapper Role'
+    );
+
+    vm.prank(unauthorizedAddr);
+    (uint256 assetAmount, ) = GHO_GSM_4626.buyAssetWithSig(
+      gsmSignerAddr,
+      DEFAULT_GSM_USDX_AMOUNT,
+      gsmSignerAddr,
+      deadline,
+      abi.encodePacked(r, s, v)
+    );
+    assertEq(assetAmount, DEFAULT_GSM_USDX_AMOUNT, 'Unexpected bought asset amount');
+  }
+
+  function testRevertBuyAssetWithSig4626UnauthorizedSigner() public {
+    uint256 deadline = block.timestamp + 1 hours;
+    (address signer, uint256 signerKey) = makeAddrAndKey('unauthorizedSigner');
+    ghoFaucet(signer, DEFAULT_GSM_GHO_AMOUNT * 2);
+    vm.prank(signer);
+    GHO_TOKEN.approve(address(GHO_GSM_4626), type(uint256).max);
+
+    bytes32 digest = _getBuyAssetTypedDataHash(
+      address(GHO_GSM_4626),
+      EIP712Types.BuyAssetWithSig({
+        originator: signer,
+        minAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: signer,
+        nonce: GHO_GSM_4626.nonces(signer),
+        deadline: deadline
+      })
+    );
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digest);
+
+    assertTrue(
+      GHO_GSM.hasRole(GSM_SWAPPER_ROLE, gsmSignerAddr),
+      'Signer does not hold the Swapper Role'
+    );
+    assertFalse(
+      GHO_GSM.hasRole(GSM_SWAPPER_ROLE, unauthorizedAddr),
+      'Relayer unexpectedly holds the Swapper Role'
+    );
+
+    // Relayed by an address that does hold the role: the signer is the one being gated
+    _expectMissingSwapperRole(signer);
+    vm.prank(ALICE);
+    GHO_GSM_4626.buyAssetWithSig(
+      signer,
+      DEFAULT_GSM_USDX_AMOUNT,
+      signer,
+      deadline,
+      abi.encodePacked(r, s, v)
+    );
+  }
+
+  function testRevertSellAssetWithSig4626UnauthorizedSigner() public {
+    uint256 deadline = block.timestamp + 1 hours;
+    (address signer, uint256 signerKey) = makeAddrAndKey('unauthorizedSigner');
+    bytes32 digest = _getSellAssetTypedDataHash(
+      address(GHO_GSM_4626),
+      EIP712Types.SellAssetWithSig({
+        originator: signer,
+        maxAmount: DEFAULT_GSM_USDX_AMOUNT,
+        receiver: signer,
+        nonce: GHO_GSM_4626.nonces(signer),
+        deadline: deadline
+      })
+    );
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digest);
+
+    assertTrue(
+      GHO_GSM.hasRole(GSM_SWAPPER_ROLE, gsmSignerAddr),
+      'Signer does not hold the Swapper Role'
+    );
+    assertFalse(
+      GHO_GSM.hasRole(GSM_SWAPPER_ROLE, unauthorizedAddr),
+      'Relayer unexpectedly holds the Swapper Role'
+    );
+
+    _expectMissingSwapperRole(signer);
+    vm.prank(ALICE);
+    GHO_GSM_4626.sellAssetWithSig(
+      signer,
+      DEFAULT_GSM_USDX_AMOUNT,
+      signer,
+      deadline,
+      abi.encodePacked(r, s, v)
+    );
+  }
+
+  function testBuyAsset4626CumulatesYieldThroughPermissionedHook() public {
+    GHO_GSM_4626.updateFeeStrategy(address(0));
+    uint256 accruedBefore = GHO_GSM_4626.getAccruedFees();
+
+    // Vault appreciates, so the GSM now holds more backing than the GHO it has drawn
+    _changeExchangeRate(USDX_4626_TOKEN, USDX_TOKEN, DEFAULT_GSM_USDX_AMOUNT, true);
+    assertEq(GHO_GSM_4626.getAccruedFees(), accruedBefore, 'Yield cumulated before any swap');
+
+    ghoFaucet(gsmSignerAddr, DEFAULT_GSM_GHO_AMOUNT * 4);
+    vm.startPrank(gsmSignerAddr);
+    GHO_TOKEN.approve(address(GHO_GSM_4626), type(uint256).max);
+    GHO_GSM_4626.buyAsset(DEFAULT_GSM_USDX_AMOUNT / 2, gsmSignerAddr);
+    vm.stopPrank();
+
+    assertGt(
+      GHO_GSM_4626.getAccruedFees(),
+      accruedBefore,
+      'Buy did not cumulate 4626 yield: super._beforeBuyAsset is not being called'
+    );
   }
 
   function testSwapAfterRoleGranted() public {
