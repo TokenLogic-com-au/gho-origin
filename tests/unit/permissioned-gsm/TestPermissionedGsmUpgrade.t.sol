@@ -105,6 +105,16 @@ abstract contract TestPermissionedGsmUpgradeBase is TestGhoBase {
     IPermissionedGsm(address(GSM)).getIsBuyAccessOpen();
     vm.expectRevert(bytes(''));
     IPermissionedGsm(address(GSM)).getIsSellAccessOpen();
+    assertEq(
+      GSM.getRoleAdmin(GSM_BUY_ASSET_ROLE),
+      DEFAULT_ADMIN_ROLE,
+      'Unexpected BUY_ASSET_ROLE admin'
+    );
+    assertEq(
+      GSM.getRoleAdmin(GSM_SELL_ASSET_ROLE),
+      DEFAULT_ADMIN_ROLE,
+      'Unexpected SELL_ASSET_ROLE admin'
+    );
 
     vm.prank(ALICE);
     (uint256 assetAmount, ) = GSM.sellAsset(DEFAULT_GSM_USDX_AMOUNT, ALICE);
@@ -131,16 +141,26 @@ abstract contract TestPermissionedGsmUpgradeBase is TestGhoBase {
     );
   }
 
-  function testAccessManagerAfterUpgradeToPermissioned() public {
-    address manager = makeAddr('accessManager');
+  function testSwapAccessManagerAfterUpgradeToPermissioned() public {
+    address manager = makeAddr('swapAccessManager');
     address permissionedImpl = _newPermissionedImpl();
     vm.prank(SHORT_EXECUTOR);
     AdminUpgradeabilityProxy(payable(address(GSM))).upgradeTo(permissionedImpl);
+    assertEq(
+      GSM.getRoleAdmin(GSM_BUY_ASSET_ROLE),
+      GSM_SWAP_ACCESS_MANAGER_ROLE,
+      'Unexpected BUY_ASSET_ROLE admin'
+    );
+    assertEq(
+      GSM.getRoleAdmin(GSM_SELL_ASSET_ROLE),
+      GSM_SWAP_ACCESS_MANAGER_ROLE,
+      'Unexpected SELL_ASSET_ROLE admin'
+    );
     GSM.grantRole(GSM_SWAP_ACCESS_MANAGER_ROLE, manager);
 
     vm.startPrank(manager);
-    IPermissionedGsm(address(GSM)).grantBuyAccess(ALICE);
-    IPermissionedGsm(address(GSM)).grantSellAccess(ALICE);
+    GSM.grantRole(GSM_BUY_ASSET_ROLE, ALICE);
+    GSM.grantRole(GSM_SELL_ASSET_ROLE, ALICE);
     vm.stopPrank();
 
     vm.startPrank(ALICE);
