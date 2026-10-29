@@ -62,6 +62,11 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
       GSM_SELL_ASSET_ROLE,
       'Unexpected SELL_ASSET_ROLE identifier'
     );
+    assertEq(
+      IPermissionedGsm(address(GSM)).SWAP_ACCESS_MANAGER_ROLE(),
+      GSM_SWAP_ACCESS_MANAGER_ROLE,
+      'Unexpected SWAP_ACCESS_MANAGER_ROLE identifier'
+    );
   }
 
   function testRevertBuyAssetUnauthorized() public {
@@ -698,34 +703,30 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
     );
   }
 
-  function testSwapRolesAdminIsDefaultAdmin() public view {
+  function testSwapRolesAdminIsSwapAccessManager() public view {
     assertEq(
       GSM.getRoleAdmin(GSM_BUY_ASSET_ROLE),
-      DEFAULT_ADMIN_ROLE,
+      GSM_SWAP_ACCESS_MANAGER_ROLE,
       'Unexpected BUY_ASSET_ROLE admin'
     );
     assertEq(
       GSM.getRoleAdmin(GSM_SELL_ASSET_ROLE),
-      DEFAULT_ADMIN_ROLE,
+      GSM_SWAP_ACCESS_MANAGER_ROLE,
       'Unexpected SELL_ASSET_ROLE admin'
+    );
+    assertEq(
+      GSM.getRoleAdmin(GSM_SWAP_ACCESS_MANAGER_ROLE),
+      DEFAULT_ADMIN_ROLE,
+      'Unexpected SWAP_ACCESS_MANAGER_ROLE admin'
+    );
+    assertEq(
+      GSM.getRoleAdmin(GSM_CONFIGURATOR_ROLE),
+      DEFAULT_ADMIN_ROLE,
+      'Unexpected CONFIGURATOR_ROLE admin'
     );
   }
 
-  function testAdminGrantsAndRevokesSwapRoles() public {
-    assertTrue(GSM.hasRole(DEFAULT_ADMIN_ROLE, address(this)), 'Test is not the admin');
-
-    GSM.grantRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr);
-    GSM.grantRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr);
-    assertTrue(GSM.hasRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr), 'BUY_ASSET_ROLE not granted');
-    assertTrue(GSM.hasRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr), 'SELL_ASSET_ROLE not granted');
-
-    GSM.revokeRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr);
-    GSM.revokeRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr);
-    assertFalse(GSM.hasRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr), 'BUY_ASSET_ROLE not revoked');
-    assertFalse(GSM.hasRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr), 'SELL_ASSET_ROLE not revoked');
-  }
-
-  function testRevertSwapRolesManagedByNonAdmin() public {
+  function testRevertSwapRolesManagedByNonManager() public {
     bytes32[6] memory roles = [
       GSM_CONFIGURATOR_ROLE,
       GSM_TOKEN_RESCUER_ROLE,
@@ -737,47 +738,215 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
     for (uint256 i = 0; i < roles.length; i++) {
       address holder = makeAddr(string.concat('roleHolder', vm.toString(i)));
       GSM.grantRole(roles[i], holder);
-
-      vm.expectRevert(
-        abi.encodeWithSelector(
-          IAccessControl.AccessControlUnauthorizedAccount.selector,
-          holder,
-          DEFAULT_ADMIN_ROLE
-        )
+      bytes memory err = abi.encodeWithSelector(
+        IAccessControl.AccessControlUnauthorizedAccount.selector,
+        holder,
+        GSM_SWAP_ACCESS_MANAGER_ROLE
       );
+
+      vm.expectRevert(err);
       vm.prank(holder);
       GSM.grantRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr);
 
-      vm.expectRevert(
-        abi.encodeWithSelector(
-          IAccessControl.AccessControlUnauthorizedAccount.selector,
-          holder,
-          DEFAULT_ADMIN_ROLE
-        )
-      );
+      vm.expectRevert(err);
       vm.prank(holder);
       GSM.grantRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr);
 
-      vm.expectRevert(
-        abi.encodeWithSelector(
-          IAccessControl.AccessControlUnauthorizedAccount.selector,
-          holder,
-          DEFAULT_ADMIN_ROLE
-        )
-      );
+      vm.expectRevert(err);
       vm.prank(holder);
       GSM.revokeRole(GSM_BUY_ASSET_ROLE, ALICE);
 
-      vm.expectRevert(
-        abi.encodeWithSelector(
-          IAccessControl.AccessControlUnauthorizedAccount.selector,
-          holder,
-          DEFAULT_ADMIN_ROLE
-        )
-      );
+      vm.expectRevert(err);
       vm.prank(holder);
       GSM.revokeRole(GSM_SELL_ASSET_ROLE, ALICE);
     }
+  }
+
+  function testSwapAccessManagerGrantsAndRevokesBuyAccess() public {
+    address manager = makeAddr('swapAccessManager');
+    GSM.grantRole(GSM_SWAP_ACCESS_MANAGER_ROLE, manager);
+
+    vm.expectEmit(true, true, true, true, address(GSM));
+    emit IAccessControl.RoleGranted(GSM_BUY_ASSET_ROLE, unauthorizedAddr, manager);
+    vm.prank(manager);
+    GSM.grantRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr);
+    assertTrue(GSM.hasRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr), 'BUY_ASSET_ROLE not granted');
+    assertFalse(GSM.hasRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr), 'SELL_ASSET_ROLE granted');
+
+    vm.prank(unauthorizedAddr);
+    (uint256 assetAmount, ) = GSM.buyAsset(DEFAULT_GSM_USDX_AMOUNT, unauthorizedAddr);
+    assertEq(assetAmount, DEFAULT_GSM_USDX_AMOUNT, 'Unexpected bought asset amount');
+
+    vm.expectEmit(true, true, true, true, address(GSM));
+    emit IAccessControl.RoleRevoked(GSM_BUY_ASSET_ROLE, unauthorizedAddr, manager);
+    vm.prank(manager);
+    GSM.revokeRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr);
+    assertFalse(GSM.hasRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr), 'BUY_ASSET_ROLE not revoked');
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        IAccessControl.AccessControlUnauthorizedAccount.selector,
+        unauthorizedAddr,
+        GSM_BUY_ASSET_ROLE
+      )
+    );
+    vm.prank(unauthorizedAddr);
+    GSM.buyAsset(DEFAULT_GSM_USDX_AMOUNT, unauthorizedAddr);
+  }
+
+  function testSwapAccessManagerGrantsAndRevokesSellAccess() public {
+    address manager = makeAddr('swapAccessManager');
+    GSM.grantRole(GSM_SWAP_ACCESS_MANAGER_ROLE, manager);
+
+    vm.expectEmit(true, true, true, true, address(GSM));
+    emit IAccessControl.RoleGranted(GSM_SELL_ASSET_ROLE, unauthorizedAddr, manager);
+    vm.prank(manager);
+    GSM.grantRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr);
+    assertTrue(GSM.hasRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr), 'SELL_ASSET_ROLE not granted');
+    assertFalse(GSM.hasRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr), 'BUY_ASSET_ROLE granted');
+
+    vm.prank(unauthorizedAddr);
+    (uint256 assetAmount, ) = GSM.sellAsset(DEFAULT_GSM_USDX_AMOUNT / 2, unauthorizedAddr);
+    assertEq(assetAmount, DEFAULT_GSM_USDX_AMOUNT / 2, 'Unexpected sold asset amount');
+
+    vm.expectEmit(true, true, true, true, address(GSM));
+    emit IAccessControl.RoleRevoked(GSM_SELL_ASSET_ROLE, unauthorizedAddr, manager);
+    vm.prank(manager);
+    GSM.revokeRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr);
+    assertFalse(GSM.hasRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr), 'SELL_ASSET_ROLE not revoked');
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        IAccessControl.AccessControlUnauthorizedAccount.selector,
+        unauthorizedAddr,
+        GSM_SELL_ASSET_ROLE
+      )
+    );
+    vm.prank(unauthorizedAddr);
+    GSM.sellAsset(DEFAULT_GSM_USDX_AMOUNT / 2, unauthorizedAddr);
+  }
+
+  function testSwapAccessManagerRevokesExistingAccess() public {
+    address manager = makeAddr('swapAccessManager');
+    GSM.grantRole(GSM_SWAP_ACCESS_MANAGER_ROLE, manager);
+    assertTrue(GSM.hasRole(GSM_BUY_ASSET_ROLE, ALICE), 'Alice does not hold the BUY_ASSET_ROLE');
+    assertTrue(GSM.hasRole(GSM_SELL_ASSET_ROLE, ALICE), 'Alice does not hold the SELL_ASSET_ROLE');
+
+    vm.startPrank(manager);
+    GSM.revokeRole(GSM_BUY_ASSET_ROLE, ALICE);
+    GSM.revokeRole(GSM_SELL_ASSET_ROLE, ALICE);
+    vm.stopPrank();
+
+    assertFalse(GSM.hasRole(GSM_BUY_ASSET_ROLE, ALICE), 'BUY_ASSET_ROLE not revoked');
+    assertFalse(GSM.hasRole(GSM_SELL_ASSET_ROLE, ALICE), 'SELL_ASSET_ROLE not revoked');
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        IAccessControl.AccessControlUnauthorizedAccount.selector,
+        ALICE,
+        GSM_BUY_ASSET_ROLE
+      )
+    );
+    vm.prank(ALICE);
+    GSM.buyAsset(DEFAULT_GSM_USDX_AMOUNT, ALICE);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        IAccessControl.AccessControlUnauthorizedAccount.selector,
+        ALICE,
+        GSM_SELL_ASSET_ROLE
+      )
+    );
+    vm.prank(ALICE);
+    GSM.sellAsset(DEFAULT_GSM_USDX_AMOUNT, ALICE);
+  }
+
+  function testSwapAccessManagerGrantAndRevokeAreIdempotent() public {
+    address manager = makeAddr('swapAccessManager');
+    GSM.grantRole(GSM_SWAP_ACCESS_MANAGER_ROLE, manager);
+
+    vm.recordLogs();
+    vm.startPrank(manager);
+    GSM.grantRole(GSM_BUY_ASSET_ROLE, ALICE);
+    GSM.grantRole(GSM_SELL_ASSET_ROLE, ALICE);
+    GSM.revokeRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr);
+    GSM.revokeRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr);
+    vm.stopPrank();
+    assertEq(vm.getRecordedLogs().length, 0, 'No-op should not emit');
+
+    assertTrue(GSM.hasRole(GSM_BUY_ASSET_ROLE, ALICE), 'BUY_ASSET_ROLE lost');
+    assertTrue(GSM.hasRole(GSM_SELL_ASSET_ROLE, ALICE), 'SELL_ASSET_ROLE lost');
+    assertFalse(GSM.hasRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr), 'BUY_ASSET_ROLE granted');
+    assertFalse(GSM.hasRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr), 'SELL_ASSET_ROLE granted');
+  }
+
+  function testAdminManagesSwapRolesOnlyWithSwapAccessManagerRole() public {
+    assertTrue(GSM.hasRole(DEFAULT_ADMIN_ROLE, address(this)), 'Test is not the admin');
+    GSM.revokeRole(GSM_SWAP_ACCESS_MANAGER_ROLE, address(this));
+    bytes memory err = abi.encodeWithSelector(
+      IAccessControl.AccessControlUnauthorizedAccount.selector,
+      address(this),
+      GSM_SWAP_ACCESS_MANAGER_ROLE
+    );
+
+    vm.expectRevert(err);
+    GSM.grantRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr);
+
+    vm.expectRevert(err);
+    GSM.grantRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr);
+
+    vm.expectRevert(err);
+    GSM.revokeRole(GSM_BUY_ASSET_ROLE, ALICE);
+
+    vm.expectRevert(err);
+    GSM.revokeRole(GSM_SELL_ASSET_ROLE, ALICE);
+
+    GSM.grantRole(GSM_SWAP_ACCESS_MANAGER_ROLE, address(this));
+    GSM.grantRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr);
+    GSM.grantRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr);
+    assertTrue(GSM.hasRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr), 'BUY_ASSET_ROLE not granted');
+    assertTrue(GSM.hasRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr), 'SELL_ASSET_ROLE not granted');
+  }
+
+  function testRevertSwapAccessManagerGrantsOtherRoles() public {
+    address manager = makeAddr('swapAccessManager');
+    GSM.grantRole(GSM_SWAP_ACCESS_MANAGER_ROLE, manager);
+    bytes32[6] memory roles = [
+      DEFAULT_ADMIN_ROLE,
+      GSM_CONFIGURATOR_ROLE,
+      GSM_TOKEN_RESCUER_ROLE,
+      GSM_SWAP_FREEZER_ROLE,
+      GSM_LIQUIDATOR_ROLE,
+      GSM_SWAP_ACCESS_MANAGER_ROLE
+    ];
+    bytes memory err = abi.encodeWithSelector(
+      IAccessControl.AccessControlUnauthorizedAccount.selector,
+      manager,
+      DEFAULT_ADMIN_ROLE
+    );
+    for (uint256 i = 0; i < roles.length; i++) {
+      vm.expectRevert(err);
+      vm.prank(manager);
+      GSM.grantRole(roles[i], unauthorizedAddr);
+    }
+  }
+
+  function testRevertSwapAccessManagerSetAccessOpen() public {
+    address manager = makeAddr('swapAccessManager');
+    GSM.grantRole(GSM_SWAP_ACCESS_MANAGER_ROLE, manager);
+    bytes memory err = abi.encodeWithSelector(
+      IAccessControl.AccessControlUnauthorizedAccount.selector,
+      manager,
+      GSM_CONFIGURATOR_ROLE
+    );
+
+    vm.expectRevert(err);
+    vm.prank(manager);
+    IPermissionedGsm(address(GSM)).setBuyAccessOpen(true);
+
+    vm.expectRevert(err);
+    vm.prank(manager);
+    IPermissionedGsm(address(GSM)).setSellAccessOpen(true);
   }
 
   function testBuyAssetToReceiverWithoutRole() public {

@@ -56,4 +56,11 @@ interface IPermissionedGsm {
    * @return The bytes32 id hash of the `SELL_ASSET_ROLE`
    */
   function SELL_ASSET_ROLE() external pure returns (bytes32);
+
+  /**
+   * @notice Returns the identifier of the `SWAP_ACCESS_MANAGER_ROLE`, the admin role of the
+   * `BUY_ASSET_ROLE` and `SELL_ASSET_ROLE`
+   * @return The bytes32 id hash of the `SWAP_ACCESS_MANAGER_ROLE`
+   */
+  function SWAP_ACCESS_MANAGER_ROLE() external pure returns (bytes32);
 }

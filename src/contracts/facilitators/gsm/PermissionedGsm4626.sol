@@ -3,6 +3,8 @@ pragma solidity ^0.8.10;
 
 import {Gsm} from 'src/contracts/facilitators/gsm/Gsm.sol';
 import {Gsm4626} from 'src/contracts/facilitators/gsm/Gsm4626.sol';
+import {AccessControl} from 'openzeppelin-contracts/contracts/access/AccessControl.sol';
+import {IAccessControl} from 'openzeppelin-contracts/contracts/access/IAccessControl.sol';
 import {IPermissionedGsm} from 'src/contracts/facilitators/gsm/interfaces/IPermissionedGsm.sol';
 
 /**
@@ -18,6 +20,9 @@ contract PermissionedGsm4626 is Gsm4626, IPermissionedGsm {
 
   /// @inheritdoc IPermissionedGsm
   bytes32 public constant SELL_ASSET_ROLE = keccak256('SELL_ASSET_ROLE');
+
+  /// @inheritdoc IPermissionedGsm
+  bytes32 public constant SWAP_ACCESS_MANAGER_ROLE = keccak256('SWAP_ACCESS_MANAGER_ROLE');
 
   bool internal _isBuyAccessOpen;
   bool internal _isSellAccessOpen;
@@ -49,6 +54,17 @@ contract PermissionedGsm4626 is Gsm4626, IPermissionedGsm {
     require(open != _isSellAccessOpen, 'GSM_NO_CHANGE_IN_SELL_ACCESS');
     _isSellAccessOpen = open;
     emit SellAccessOpenUpdated(msg.sender, open);
+  }
+
+  /// @inheritdoc IAccessControl
+  /// @dev The `SWAP_ACCESS_MANAGER_ROLE` administers the `BUY_ASSET_ROLE` and `SELL_ASSET_ROLE`
+  function getRoleAdmin(
+    bytes32 role
+  ) public view override(AccessControl, IAccessControl) returns (bytes32) {
+    if (role == BUY_ASSET_ROLE || role == SELL_ASSET_ROLE) {
+      return SWAP_ACCESS_MANAGER_ROLE;
+    }
+    return super.getRoleAdmin(role);
   }
 
   /// @inheritdoc IPermissionedGsm
