@@ -19,6 +19,9 @@ contract PermissionedGsm4626 is Gsm4626, IPermissionedGsm {
   /// @inheritdoc IPermissionedGsm
   bytes32 public constant SELL_ASSET_ROLE = keccak256('SELL_ASSET_ROLE');
 
+  /// @inheritdoc IPermissionedGsm
+  bytes32 public constant SWAP_GUARDIAN_ROLE = keccak256('SWAP_GUARDIAN_ROLE');
+
   bool internal _isBuyAccessOpen;
   bool internal _isSellAccessOpen;
 
@@ -49,6 +52,24 @@ contract PermissionedGsm4626 is Gsm4626, IPermissionedGsm {
     require(open != _isSellAccessOpen, 'GSM_NO_CHANGE_IN_SELL_ACCESS');
     _isSellAccessOpen = open;
     emit SellAccessOpenUpdated(msg.sender, open);
+  }
+
+  /// @inheritdoc IPermissionedGsm
+  function revokeSwapRoles(address swapper) external onlyRole(SWAP_GUARDIAN_ROLE) {
+    _revokeRole(BUY_ASSET_ROLE, swapper);
+    _revokeRole(SELL_ASSET_ROLE, swapper);
+  }
+
+  /// @inheritdoc IPermissionedGsm
+  function closeSwapAccess() external onlyRole(SWAP_GUARDIAN_ROLE) {
+    if (_isBuyAccessOpen) {
+      _isBuyAccessOpen = false;
+      emit BuyAccessOpenUpdated(msg.sender, false);
+    }
+    if (_isSellAccessOpen) {
+      _isSellAccessOpen = false;
+      emit SellAccessOpenUpdated(msg.sender, false);
+    }
   }
 
   /// @inheritdoc IPermissionedGsm
