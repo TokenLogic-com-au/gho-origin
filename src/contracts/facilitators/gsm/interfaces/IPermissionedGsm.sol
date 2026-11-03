@@ -8,18 +8,18 @@ pragma solidity ^0.8.0;
  */
 interface IPermissionedGsm {
   /**
-   * @dev Emitted when the Configurator lifts or restores the buy restriction
-   * @param configurator The address of the Configurator
+   * @dev Emitted when the Configurator or the Swap Guardian lifts or restores the buy restriction
+   * @param caller The address of the caller
    * @param open True if `buyAsset` is open to any address, False otherwise
    */
-  event BuyAccessOpenUpdated(address indexed configurator, bool open);
+  event BuyAccessOpenUpdated(address indexed caller, bool open);
 
   /**
-   * @dev Emitted when the Configurator lifts or restores the sell restriction
-   * @param configurator The address of the Configurator
+   * @dev Emitted when the Configurator or the Swap Guardian lifts or restores the sell restriction
+   * @param caller The address of the caller
    * @param open True if `sellAsset` is open to any address, False otherwise
    */
-  event SellAccessOpenUpdated(address indexed configurator, bool open);
+  event SellAccessOpenUpdated(address indexed caller, bool open);
 
   /**
    * @notice Lift or restore the `BUY_ASSET_ROLE` restriction on buys

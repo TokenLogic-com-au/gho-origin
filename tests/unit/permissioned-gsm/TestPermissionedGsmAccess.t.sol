@@ -892,6 +892,16 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
     );
     vm.prank(unauthorizedAddr);
     GSM.buyAsset(DEFAULT_GSM_USDX_AMOUNT, unauthorizedAddr);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        IAccessControl.AccessControlUnauthorizedAccount.selector,
+        unauthorizedAddr,
+        GSM_SELL_ASSET_ROLE
+      )
+    );
+    vm.prank(unauthorizedAddr);
+    GSM.sellAsset(DEFAULT_GSM_USDX_AMOUNT, unauthorizedAddr);
   }
 
   function testCloseSwapAccessOnlyOpenSide() public {
@@ -922,14 +932,15 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
 
   function testRevertSwapGuardianCannotGrantOrOpen() public {
     address guardian = _grantGuardian();
-    bytes32[7] memory roles = [
+    bytes32[8] memory roles = [
       DEFAULT_ADMIN_ROLE,
       GSM_CONFIGURATOR_ROLE,
       GSM_TOKEN_RESCUER_ROLE,
       GSM_SWAP_FREEZER_ROLE,
       GSM_LIQUIDATOR_ROLE,
       GSM_BUY_ASSET_ROLE,
-      GSM_SELL_ASSET_ROLE
+      GSM_SELL_ASSET_ROLE,
+      GSM_SWAP_GUARDIAN_ROLE
     ];
     bytes memory adminErr = abi.encodeWithSelector(
       IAccessControl.AccessControlUnauthorizedAccount.selector,
