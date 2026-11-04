@@ -51,6 +51,17 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
     uint256 needed
   ) internal pure virtual returns (bytes memory);
 
+  function _unauthorizedError(address account, bytes32 role) internal pure returns (bytes memory) {
+    return
+      abi.encodeWithSelector(
+        IAccessControl.AccessControlUnauthorizedAccount.selector,
+        account,
+        role
+      );
+  }
+
+  function _newPermissionedImpl() internal virtual returns (address);
+
   function testRoleIdentifiers() public view {
     assertEq(
       IPermissionedGsm(address(GSM)).BUY_ASSET_ROLE(),
@@ -444,7 +455,7 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
       abi.encodeWithSelector(
         IAccessControl.AccessControlUnauthorizedAccount.selector,
         unauthorizedAddr,
-        GSM_CONFIGURATOR_ROLE
+        GSM_SWAP_ACCESS_MANAGER_ROLE
       )
     );
     vm.prank(unauthorizedAddr);
@@ -456,7 +467,7 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
       abi.encodeWithSelector(
         IAccessControl.AccessControlUnauthorizedAccount.selector,
         unauthorizedAddr,
-        GSM_CONFIGURATOR_ROLE
+        GSM_SWAP_ACCESS_MANAGER_ROLE
       )
     );
     vm.prank(unauthorizedAddr);
@@ -703,7 +714,7 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
     );
   }
 
-  function testSwapRolesAdminIsSwapAccessManager() public view {
+  function testInitializeSetsSwapAccessManagerAsOnlySwapRolesAdmin() public view {
     assertEq(
       GSM.getRoleAdmin(GSM_BUY_ASSET_ROLE),
       GSM_SWAP_ACCESS_MANAGER_ROLE,
@@ -714,16 +725,57 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
       GSM_SWAP_ACCESS_MANAGER_ROLE,
       'Unexpected SELL_ASSET_ROLE admin'
     );
-    assertEq(
-      GSM.getRoleAdmin(GSM_SWAP_ACCESS_MANAGER_ROLE),
+    bytes32[6] memory roles = [
       DEFAULT_ADMIN_ROLE,
-      'Unexpected SWAP_ACCESS_MANAGER_ROLE admin'
-    );
-    assertEq(
-      GSM.getRoleAdmin(GSM_CONFIGURATOR_ROLE),
+      GSM_CONFIGURATOR_ROLE,
+      GSM_TOKEN_RESCUER_ROLE,
+      GSM_SWAP_FREEZER_ROLE,
+      GSM_LIQUIDATOR_ROLE,
+      GSM_SWAP_ACCESS_MANAGER_ROLE
+    ];
+    for (uint256 i = 0; i < roles.length; i++) {
+      assertEq(GSM.getRoleAdmin(roles[i]), DEFAULT_ADMIN_ROLE, 'Unexpected role admin');
+    }
+  }
+
+  function testInitializeEmitsSwapRolesAdminChangedWithoutGrantingManager() public {
+    address impl = _newPermissionedImpl();
+    address proxy = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
+
+    vm.expectEmit(true, true, true, true, proxy);
+    emit IAccessControl.RoleAdminChanged(
+      GSM_BUY_ASSET_ROLE,
       DEFAULT_ADMIN_ROLE,
-      'Unexpected CONFIGURATOR_ROLE admin'
+      GSM_SWAP_ACCESS_MANAGER_ROLE
     );
+    vm.expectEmit(true, true, true, true, proxy);
+    emit IAccessControl.RoleAdminChanged(
+      GSM_SELL_ASSET_ROLE,
+      DEFAULT_ADMIN_ROLE,
+      GSM_SWAP_ACCESS_MANAGER_ROLE
+    );
+    new AdminUpgradeabilityProxy(
+      impl,
+      SHORT_EXECUTOR,
+      abi.encodeWithSignature(
+        'initialize(address,address,uint128,address)',
+        address(this),
+        TREASURY,
+        DEFAULT_GSM_USDX_EXPOSURE,
+        address(GHO_RESERVE)
+      )
+    );
+
+    Gsm deployed = Gsm(proxy);
+    assertFalse(
+      deployed.hasRole(GSM_SWAP_ACCESS_MANAGER_ROLE, address(this)),
+      'Unexpected SWAP_ACCESS_MANAGER_ROLE granted'
+    );
+  }
+
+  function testRevertInitializeTwice() public {
+    vm.expectRevert('Contract instance has already been initialized');
+    GSM.initialize(address(this), TREASURY, DEFAULT_GSM_USDX_EXPOSURE, address(GHO_RESERVE));
   }
 
   function testRevertSwapRolesManagedByNonManager() public {
@@ -931,21 +983,50 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
     }
   }
 
-  function testRevertSwapAccessManagerSetAccessOpen() public {
+  function testSwapAccessManagerSetsAccessOpen() public {
     address manager = makeAddr('swapAccessManager');
     GSM.grantRole(GSM_SWAP_ACCESS_MANAGER_ROLE, manager);
-    bytes memory err = abi.encodeWithSelector(
-      IAccessControl.AccessControlUnauthorizedAccount.selector,
-      manager,
-      GSM_CONFIGURATOR_ROLE
-    );
 
-    vm.expectRevert(err);
+    vm.expectEmit(true, true, true, true, address(GSM));
+    emit IPermissionedGsm.BuyAccessOpenUpdated(manager, true);
     vm.prank(manager);
     IPermissionedGsm(address(GSM)).setBuyAccessOpen(true);
 
-    vm.expectRevert(err);
+    vm.expectEmit(true, true, true, true, address(GSM));
+    emit IPermissionedGsm.SellAccessOpenUpdated(manager, true);
     vm.prank(manager);
+    IPermissionedGsm(address(GSM)).setSellAccessOpen(true);
+
+    assertTrue(IPermissionedGsm(address(GSM)).getIsBuyAccessOpen(), 'Unexpected buy access status');
+    assertTrue(
+      IPermissionedGsm(address(GSM)).getIsSellAccessOpen(),
+      'Unexpected sell access status'
+    );
+  }
+
+  function testRevertSetAccessOpenByConfigurator() public {
+    address configurator = makeAddr('configurator');
+    GSM.grantRole(GSM_CONFIGURATOR_ROLE, configurator);
+    bytes memory err = _unauthorizedError(configurator, GSM_SWAP_ACCESS_MANAGER_ROLE);
+
+    vm.expectRevert(err);
+    vm.prank(configurator);
+    IPermissionedGsm(address(GSM)).setBuyAccessOpen(true);
+
+    vm.expectRevert(err);
+    vm.prank(configurator);
+    IPermissionedGsm(address(GSM)).setSellAccessOpen(true);
+  }
+
+  function testRevertSetAccessOpenByDefaultAdminWithoutManagerRole() public {
+    GSM.revokeRole(GSM_SWAP_ACCESS_MANAGER_ROLE, address(this));
+    assertTrue(GSM.hasRole(DEFAULT_ADMIN_ROLE, address(this)), 'Test is not the admin');
+    bytes memory err = _unauthorizedError(address(this), GSM_SWAP_ACCESS_MANAGER_ROLE);
+
+    vm.expectRevert(err);
+    IPermissionedGsm(address(GSM)).setBuyAccessOpen(true);
+
+    vm.expectRevert(err);
     IPermissionedGsm(address(GSM)).setSellAccessOpen(true);
   }
 
@@ -1181,6 +1262,17 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
 }
 
 contract TestPermissionedGsmAccess is TestPermissionedGsmAccessBase {
+  function _newPermissionedImpl() internal override returns (address) {
+    return
+      address(
+        new PermissionedGsm(
+          address(GHO_TOKEN),
+          address(USDX_TOKEN),
+          address(GHO_GSM_FIXED_PRICE_STRATEGY)
+        )
+      );
+  }
+
   function _gsm() internal view override returns (Gsm) {
     return GHO_GSM;
   }
@@ -1204,6 +1296,17 @@ contract TestPermissionedGsmAccess is TestPermissionedGsmAccessBase {
 }
 
 contract TestPermissionedGsm4626Access is TestPermissionedGsmAccessBase {
+  function _newPermissionedImpl() internal override returns (address) {
+    return
+      address(
+        new PermissionedGsm4626(
+          address(GHO_TOKEN),
+          address(USDX_4626_TOKEN),
+          address(GHO_GSM_4626_FIXED_PRICE_STRATEGY)
+        )
+      );
+  }
+
   function _gsm() internal view override returns (Gsm) {
     return Gsm(address(GHO_GSM_4626));
   }

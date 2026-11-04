@@ -50,6 +50,16 @@ abstract contract TestPermissionedGsmUpgradeBase is TestGhoBase {
       IPermissionedGsm(address(GSM)).getIsSellAccessOpen(),
       'Unexpected sell access status'
     );
+    assertEq(
+      GSM.getRoleAdmin(GSM_BUY_ASSET_ROLE),
+      DEFAULT_ADMIN_ROLE,
+      'Unexpected BUY_ASSET_ROLE admin'
+    );
+    assertEq(
+      GSM.getRoleAdmin(GSM_SELL_ASSET_ROLE),
+      DEFAULT_ADMIN_ROLE,
+      'Unexpected SELL_ASSET_ROLE admin'
+    );
 
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -127,6 +137,7 @@ abstract contract TestPermissionedGsmUpgradeBase is TestGhoBase {
 
     vm.prank(SHORT_EXECUTOR);
     AdminUpgradeabilityProxy(payable(address(GSM))).upgradeTo(permissionedImpl);
+    GSM.grantRole(GSM_SWAP_ACCESS_MANAGER_ROLE, address(this));
     IPermissionedGsm(address(GSM)).setBuyAccessOpen(true);
 
     vm.prank(SHORT_EXECUTOR);
@@ -139,36 +150,6 @@ abstract contract TestPermissionedGsmUpgradeBase is TestGhoBase {
       IPermissionedGsm(address(GSM)).getIsSellAccessOpen(),
       'Unexpected sell access status'
     );
-  }
-
-  function testSwapAccessManagerAfterUpgradeToPermissioned() public {
-    address manager = makeAddr('swapAccessManager');
-    address permissionedImpl = _newPermissionedImpl();
-    vm.prank(SHORT_EXECUTOR);
-    AdminUpgradeabilityProxy(payable(address(GSM))).upgradeTo(permissionedImpl);
-    assertEq(
-      GSM.getRoleAdmin(GSM_BUY_ASSET_ROLE),
-      GSM_SWAP_ACCESS_MANAGER_ROLE,
-      'Unexpected BUY_ASSET_ROLE admin'
-    );
-    assertEq(
-      GSM.getRoleAdmin(GSM_SELL_ASSET_ROLE),
-      GSM_SWAP_ACCESS_MANAGER_ROLE,
-      'Unexpected SELL_ASSET_ROLE admin'
-    );
-    GSM.grantRole(GSM_SWAP_ACCESS_MANAGER_ROLE, manager);
-
-    vm.startPrank(manager);
-    GSM.grantRole(GSM_BUY_ASSET_ROLE, ALICE);
-    GSM.grantRole(GSM_SELL_ASSET_ROLE, ALICE);
-    vm.stopPrank();
-
-    vm.startPrank(ALICE);
-    GSM.sellAsset(DEFAULT_GSM_USDX_AMOUNT, ALICE);
-    GHO_TOKEN.approve(address(GSM), type(uint256).max);
-    (uint256 assetAmount, ) = GSM.buyAsset(DEFAULT_GSM_USDX_AMOUNT, ALICE);
-    vm.stopPrank();
-    assertEq(assetAmount, DEFAULT_GSM_USDX_AMOUNT, 'Unexpected bought asset amount');
   }
 
   function _getStorageSnapshot() internal view returns (bytes32[] memory) {
