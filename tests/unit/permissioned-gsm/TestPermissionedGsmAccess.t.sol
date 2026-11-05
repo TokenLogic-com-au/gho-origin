@@ -51,15 +51,6 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
     uint256 needed
   ) internal pure virtual returns (bytes memory);
 
-  function _unauthorizedError(address account, bytes32 role) internal pure returns (bytes memory) {
-    return
-      abi.encodeWithSelector(
-        IAccessControl.AccessControlUnauthorizedAccount.selector,
-        account,
-        role
-      );
-  }
-
   function _newPermissionedImpl() internal virtual returns (address);
 
   function testRoleIdentifiers() public view {
@@ -1007,7 +998,10 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
   function testRevertSetAccessOpenByConfigurator() public {
     address configurator = makeAddr('configurator');
     GSM.grantRole(GSM_CONFIGURATOR_ROLE, configurator);
-    bytes memory err = _unauthorizedError(configurator, GSM_SWAP_ACCESS_MANAGER_ROLE);
+    bytes memory err = AccessControlErrorsLib.UNAUTHORIZED_ACCOUNT(
+      GSM_SWAP_ACCESS_MANAGER_ROLE,
+      configurator
+    );
 
     vm.expectRevert(err);
     vm.prank(configurator);
@@ -1021,7 +1015,10 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
   function testRevertSetAccessOpenByDefaultAdminWithoutManagerRole() public {
     GSM.revokeRole(GSM_SWAP_ACCESS_MANAGER_ROLE, address(this));
     assertTrue(GSM.hasRole(DEFAULT_ADMIN_ROLE, address(this)), 'Test is not the admin');
-    bytes memory err = _unauthorizedError(address(this), GSM_SWAP_ACCESS_MANAGER_ROLE);
+    bytes memory err = AccessControlErrorsLib.UNAUTHORIZED_ACCOUNT(
+      GSM_SWAP_ACCESS_MANAGER_ROLE,
+      address(this)
+    );
 
     vm.expectRevert(err);
     IPermissionedGsm(address(GSM)).setBuyAccessOpen(true);
