@@ -333,6 +333,8 @@ interface IGsm is IAccessControl, IGhoFacilitator {
 
   /**
    * @notice Returns whether or not swaps via buyAsset/sellAsset are currently possible
+   * @dev Returns the global swap state of the GSM and does not depend on the caller. An
+   * implementation can still restrict swaps per address.
    * @return True if the GSM has swapping enabled, false otherwise
    */
   function canSwap() external view returns (bool);

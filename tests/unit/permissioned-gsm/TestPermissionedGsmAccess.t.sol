@@ -1009,6 +1009,174 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
     vm.prank(originator);
     GSM.sellAsset(DEFAULT_GSM_USDX_AMOUNT, originator);
   }
+
+  function _canSwap(address originator, bool isBuy) internal view returns (bool) {
+    return IPermissionedGsm(address(GSM)).canSwap(originator, isBuy);
+  }
+
+  function _swapRole(bool isBuy) internal pure returns (bytes32) {
+    return isBuy ? GSM_BUY_ASSET_ROLE : GSM_SELL_ASSET_ROLE;
+  }
+
+  function _setAccessOpen(bool isBuy, bool open) internal {
+    if (isBuy) {
+      IPermissionedGsm(address(GSM)).setBuyAccessOpen(open);
+    } else {
+      IPermissionedGsm(address(GSM)).setSellAccessOpen(open);
+    }
+  }
+
+  function _assertCanSwapMatchesSwap(
+    address originator,
+    bool isBuy,
+    bytes memory revertData
+  ) internal {
+    bool expected = revertData.length == 0;
+    assertEq(_canSwap(originator, isBuy), expected, 'Unexpected view result');
+    uint256 snapshotId = vm.snapshotState();
+    vm.prank(originator);
+    (bool success, bytes memory returnData) = address(GSM).call(
+      isBuy
+        ? abi.encodeCall(GSM.buyAsset, (DEFAULT_GSM_USDX_AMOUNT, originator))
+        : abi.encodeCall(GSM.sellAsset, (DEFAULT_GSM_USDX_AMOUNT, originator))
+    );
+    vm.revertToState(snapshotId);
+
+    assertEq(success, expected, 'View result does not match the swap outcome');
+    if (!success) {
+      assertEq(returnData, revertData, 'Unexpected swap revert data');
+    }
+  }
+
+  function _roleRevertData(address originator, bool isBuy) internal pure returns (bytes memory) {
+    return
+      abi.encodeWithSelector(
+        IAccessControl.AccessControlUnauthorizedAccount.selector,
+        originator,
+        _swapRole(isBuy)
+      );
+  }
+
+  function testCanSwapRoleAndFlagTruthTable() public {
+    address holder = makeAddr('holder');
+    address otherSideHolder = makeAddr('otherSideHolder');
+
+    for (uint256 i = 0; i < 2; i++) {
+      bool isBuy = i == 0;
+      GSM.grantRole(_swapRole(isBuy), holder);
+      GSM.grantRole(_swapRole(!isBuy), otherSideHolder);
+
+      assertFalse(_canSwap(unauthorizedAddr, isBuy), 'Closed without role');
+      assertTrue(_canSwap(holder, isBuy), 'Closed with matching role');
+      assertFalse(_canSwap(otherSideHolder, isBuy), 'Closed with only the other side role');
+
+      _setAccessOpen(isBuy, true);
+      assertTrue(_canSwap(unauthorizedAddr, isBuy), 'Open without role');
+      assertTrue(_canSwap(holder, isBuy), 'Open with matching role');
+      assertFalse(_canSwap(unauthorizedAddr, !isBuy), 'Opening one side opened the other');
+      assertFalse(_canSwap(holder, !isBuy), 'Opening one side opened the other for a holder');
+      assertTrue(_canSwap(otherSideHolder, !isBuy), 'Other side role lost after opening');
+
+      _setAccessOpen(isBuy, false);
+      assertFalse(_canSwap(unauthorizedAddr, isBuy), 'Closed again without role');
+
+      GSM.revokeRole(_swapRole(isBuy), holder);
+      GSM.revokeRole(_swapRole(!isBuy), otherSideHolder);
+    }
+  }
+
+  function testCanSwapWhenFrozen() public {
+    address holder = makeAddr('holder');
+    GSM.grantRole(GSM_BUY_ASSET_ROLE, holder);
+    GSM.grantRole(GSM_SELL_ASSET_ROLE, holder);
+
+    vm.prank(address(GHO_GSM_SWAP_FREEZER));
+    GSM.setSwapFreeze(true);
+    for (uint256 i = 0; i < 2; i++) {
+      bool isBuy = i == 0;
+      assertFalse(_canSwap(holder, isBuy), 'Frozen with role');
+      _setAccessOpen(isBuy, true);
+      assertFalse(_canSwap(unauthorizedAddr, isBuy), 'Frozen with access open');
+      _setAccessOpen(isBuy, false);
+    }
+
+    vm.prank(address(GHO_GSM_SWAP_FREEZER));
+    GSM.setSwapFreeze(false);
+    assertTrue(_canSwap(holder, true), 'Unfrozen buy with role');
+    assertTrue(_canSwap(holder, false), 'Unfrozen sell with role');
+    assertFalse(_canSwap(unauthorizedAddr, true), 'Unfrozen buy without role');
+  }
+
+  function testCanSwapWhenSeized() public {
+    address holder = makeAddr('holder');
+    GSM.grantRole(GSM_BUY_ASSET_ROLE, holder);
+    GSM.grantRole(GSM_SELL_ASSET_ROLE, holder);
+    IPermissionedGsm(address(GSM)).setBuyAccessOpen(true);
+    IPermissionedGsm(address(GSM)).setSellAccessOpen(true);
+
+    vm.prank(address(GHO_GSM_LAST_RESORT_LIQUIDATOR));
+    GSM.seize();
+
+    for (uint256 i = 0; i < 2; i++) {
+      bool isBuy = i == 0;
+      assertFalse(_canSwap(holder, isBuy), 'Seized with role');
+      assertFalse(_canSwap(unauthorizedAddr, isBuy), 'Seized with access open');
+    }
+  }
+
+  function testCanSwapMatchesSwap() public {
+    for (uint256 i = 0; i < 2; i++) {
+      bool isBuy = i == 0;
+
+      _assertCanSwapMatchesSwap(unauthorizedAddr, isBuy, _roleRevertData(unauthorizedAddr, isBuy));
+
+      _setAccessOpen(isBuy, true);
+      _assertCanSwapMatchesSwap(unauthorizedAddr, isBuy, '');
+      _setAccessOpen(isBuy, false);
+
+      GSM.grantRole(_swapRole(!isBuy), unauthorizedAddr);
+      _assertCanSwapMatchesSwap(unauthorizedAddr, isBuy, _roleRevertData(unauthorizedAddr, isBuy));
+      GSM.revokeRole(_swapRole(!isBuy), unauthorizedAddr);
+
+      GSM.grantRole(_swapRole(isBuy), unauthorizedAddr);
+      _assertCanSwapMatchesSwap(unauthorizedAddr, isBuy, '');
+      GSM.revokeRole(_swapRole(isBuy), unauthorizedAddr);
+    }
+  }
+
+  function testCanSwapIsGlobalAndCallerIndependent() public {
+    assertTrue(GSM.canSwap(), 'Unexpected global swap state');
+    assertFalse(_canSwap(unauthorizedAddr, true), 'Unexpected originator buy state');
+    assertFalse(_canSwap(unauthorizedAddr, false), 'Unexpected originator sell state');
+
+    vm.prank(unauthorizedAddr);
+    assertTrue(GSM.canSwap(), 'Global swap state depends on the caller');
+
+    vm.expectRevert(_roleRevertData(unauthorizedAddr, true));
+    vm.prank(unauthorizedAddr);
+    GSM.buyAsset(DEFAULT_GSM_USDX_AMOUNT, unauthorizedAddr);
+  }
+
+  function testFuzzCanSwapOriginator(
+    address originator,
+    bool isBuy,
+    bool hasSwapRole,
+    bool otherSideRole,
+    bool open
+  ) public {
+    GSM.revokeRole(_swapRole(isBuy), originator);
+    if (hasSwapRole) {
+      GSM.grantRole(_swapRole(isBuy), originator);
+    }
+    if (otherSideRole) {
+      GSM.grantRole(_swapRole(!isBuy), originator);
+    }
+    if (open) {
+      _setAccessOpen(isBuy, true);
+    }
+
+    assertEq(_canSwap(originator, isBuy), open || hasSwapRole, 'Unexpected originator swap state');
+  }
 }
 
 contract TestPermissionedGsmAccess is TestPermissionedGsmAccessBase {

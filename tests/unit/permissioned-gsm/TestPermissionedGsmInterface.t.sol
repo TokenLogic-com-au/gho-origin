@@ -25,6 +25,8 @@ contract TestPermissionedGsmInterface is TestGhoBase {
     IPermissionedGsm(address(GHO_GSM)).BUY_ASSET_ROLE();
     vm.expectRevert(bytes(''));
     IPermissionedGsm(address(GHO_GSM)).SELL_ASSET_ROLE();
+    vm.expectRevert(bytes(''));
+    IPermissionedGsm(address(GHO_GSM)).canSwap(address(this), true);
   }
 
   function testRevertPermissionedFunctionsOnGsm4626() public {
@@ -44,5 +46,7 @@ contract TestPermissionedGsmInterface is TestGhoBase {
     IPermissionedGsm(address(GHO_GSM_4626)).BUY_ASSET_ROLE();
     vm.expectRevert(bytes(''));
     IPermissionedGsm(address(GHO_GSM_4626)).SELL_ASSET_ROLE();
+    vm.expectRevert(bytes(''));
+    IPermissionedGsm(address(GHO_GSM_4626)).canSwap(address(this), true);
   }
 }

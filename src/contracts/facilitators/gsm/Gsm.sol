@@ -397,7 +397,7 @@ contract Gsm is AccessControl, VersionedInitializable, EIP712, IGsm {
   }
 
   /// @inheritdoc IGsm
-  function canSwap() external view returns (bool) {
+  function canSwap() public view returns (bool) {
     return !_isFrozen && !_isSeized;
   }
 
