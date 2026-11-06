@@ -62,17 +62,6 @@ contract PermissionedGsm4626 is Gsm4626, IPermissionedGsm {
     return _isSellAccessOpen;
   }
 
-  /// @inheritdoc IPermissionedGsm
-  function canSwap(address originator, bool isBuy) external view returns (bool) {
-    if (!canSwap()) {
-      return false;
-    }
-    return
-      isBuy
-        ? _isBuyAccessOpen || hasRole(BUY_ASSET_ROLE, originator)
-        : _isSellAccessOpen || hasRole(SELL_ASSET_ROLE, originator);
-  }
-
   /// @inheritdoc Gsm
   function _buyAsset(
     address originator,

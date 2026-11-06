@@ -46,18 +46,6 @@ interface IPermissionedGsm {
   function getIsSellAccessOpen() external view returns (bool);
 
   /**
-   * @notice Returns whether `originator` can currently buy or sell through the GSM
-   * @dev The result covers the frozen and seized state, the buy or sell open flag, and the role of
-   * the originator. It does not check amounts, exposure, reserve limit, liquidity, balances,
-   * allowances or signatures, so a swap can still revert for those reasons.
-   * @param originator The address of the caller, or of the signer for signature swaps
-   * @param isBuy True to check `buyAsset`, false to check `sellAsset`
-   * @return True if the GSM is not frozen or seized and the originator is allowed to swap, false
-   * otherwise
-   */
-  function canSwap(address originator, bool isBuy) external view returns (bool);
-
-  /**
    * @notice Returns the identifier of the `BUY_ASSET_ROLE`
    * @return The bytes32 id hash of the `BUY_ASSET_ROLE`
    */
