@@ -40,8 +40,14 @@ contract PermissionedGsm4626 is Gsm4626, IPermissionedGsm {
     // Intentionally left blank
   }
 
-  /// @inheritdoc Gsm
-  /// @dev The `SWAP_ACCESS_MANAGER_ROLE` administers the `BUY_ASSET_ROLE` and `SELL_ASSET_ROLE`
+  /**
+   * @notice GSM initializer
+   * @dev The `SWAP_ACCESS_MANAGER_ROLE` administers the `BUY_ASSET_ROLE` and `SELL_ASSET_ROLE`
+   * @param admin The address of the default admin role
+   * @param ghoTreasury The address of the GHO treasury
+   * @param exposureCap Maximum amount of user-supplied underlying asset in GSM
+   * @param ghoReserve The address of the GHO reserve to use tokens from
+   */
   function initialize(
     address admin,
     address ghoTreasury,
