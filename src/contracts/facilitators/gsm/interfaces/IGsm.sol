@@ -332,8 +332,8 @@ interface IGsm is IAccessControl, IGhoFacilitator {
   function getLimit() external view returns (uint256);
 
   /**
-  * @notice Returns whether swaps via buyAsset/sellAsset are operational
-  * @dev Ignores caller's permissions or any applicable limits
+   * @notice Returns whether swaps via buyAsset/sellAsset are operational
+   * @dev Ignores caller's permissions or any applicable limits
    * @return True if the GSM has swapping enabled, false otherwise
    */
   function canSwap() external view returns (bool);

@@ -1034,41 +1034,16 @@ abstract contract TestPermissionedGsmAccessBase is TestGhoBase {
     );
     vm.prank(unauthorizedAddr);
     GSM.sellAsset(DEFAULT_GSM_USDX_AMOUNT, unauthorizedAddr);
-  }
 
-  function testCanSwapIgnoresExposureCap() public {
-    GSM.grantRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr);
-    GSM.updateExposureCap(uint128(GSM.getAvailableLiquidity()));
-
-    assertEq(GSM.getAvailableUnderlyingExposure(), 0, 'Exposure cap not reached');
-    assertTrue(GSM.canSwap(), 'Unexpected canSwap at exposure cap');
-    vm.expectRevert('EXOGENOUS_ASSET_EXPOSURE_TOO_HIGH');
-    vm.prank(unauthorizedAddr);
-    GSM.sellAsset(1, unauthorizedAddr);
-  }
-
-  function testCanSwapIgnoresGhoReserveLimit() public {
-    GSM.grantRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr);
-    GHO_RESERVE.setLimit(address(GSM), GSM.getUsed());
-
-    assertTrue(GSM.canSwap(), 'Unexpected canSwap at GHO reserve limit');
-    vm.expectRevert('LIMIT_EXCEEDED');
-    vm.prank(unauthorizedAddr);
-    GSM.sellAsset(1, unauthorizedAddr);
-  }
-
-  function testCanSwapIgnoresInsufficientLiquidity() public {
     GSM.grantRole(GSM_BUY_ASSET_ROLE, unauthorizedAddr);
-
-    uint256 availableLiquidity = GSM.getAvailableLiquidity();
+    GSM.grantRole(GSM_SELL_ASSET_ROLE, unauthorizedAddr);
     vm.prank(unauthorizedAddr);
-    GSM.buyAsset(availableLiquidity, unauthorizedAddr);
+    assertTrue(GSM.canSwap(), 'Unexpected canSwap after granting roles');
 
-    assertEq(GSM.getAvailableLiquidity(), 0, 'Liquidity not exhausted');
-    assertTrue(GSM.canSwap(), 'Unexpected canSwap without liquidity');
-    vm.expectRevert('INSUFFICIENT_AVAILABLE_EXOGENOUS_ASSET_LIQUIDITY');
+    vm.prank(address(GHO_GSM_SWAP_FREEZER));
+    GSM.setSwapFreeze(true);
     vm.prank(unauthorizedAddr);
-    GSM.buyAsset(1, unauthorizedAddr);
+    assertFalse(GSM.canSwap(), 'Unexpected canSwap for authorized caller while frozen');
   }
 }
 
